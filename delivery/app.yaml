@@ -1,0 +1,18 @@
+name: delivery
+app_id: da_nP7IptBUAY49
+owner: test01
+package: '.'
+env: 
+  DB_HOST: ${{DB_HOST}}
+  DB_PORT: ${{DB_PORT}}
+  DB_NAME: ${{DB_NAME}}
+  DB_USERNAME: ${{DB_USERNAME}}
+  DB_PASSWORD: ${{DB_PASSWORD}}
+capabilities:
+  database:
+    engine: mysql
+scaling:
+  mode: single_concurrency
+kind: wasmer.io/App.v0
+# files:
+# - '.env'

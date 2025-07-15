@@ -1,0 +1,29 @@
+{
+    "name": "antinna/delivery",
+    "description": "All Online Pay workflows here",
+    "type": "project",
+    "require": {
+      "php": "8.1.*||8.2.*||8.3.*||8.4.*",
+      "ext-pdo": "*",
+        "vlucas/phpdotenv": "^5.6"
+    },
+
+  "minimum-stability": "stable",
+  "prefer-stable": true,
+    "license": "MIT",
+    "autoload": {
+      "psr-4": {
+        "Antinna\\Delivery\\": "./"
+      }
+    },
+    "authors": [
+        {
+            "name": "Manishmg3994",
+            "email": "manishgautammg7@gmail.com"
+        },
+        {
+            "name": "All contributors",
+            "homepage": "https://github.com/Antinna/Delivery/contributors"
+        }
+    ]
+}
