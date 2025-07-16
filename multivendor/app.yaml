@@ -1,29 +1,141 @@
-name: multivendor
-app_id: da_nP7IptBUAY49
-owner: test01
-package: '.'
-env:
-  DB_HOST: ${{DB_HOST}}
-  DB_PORT: ${{DB_PORT}}
-  DB_NAME: ${{DB_NAME}}
-  DB_USERNAME: ${{DB_USERNAME}}
-  DB_PASSWORD: ${{DB_PASSWORD}}
-  ADMIN_USERNAME: ${{ADMIN_USERNAME}}
-  ADMIN_PASSWORD: ${{ADMIN_PASSWORD}}
-  APP_ENV: ${{APP_ENV}}
-  APP_DEBUG: ${{APP_DEBUG}}
-  FIREBASE_SERVER_KEY: ${{FIREBASE_SERVER_KEY}}
-  SMS_API_KEY: ${{SMS_API_KEY}}
-  EMAIL_SMTP_HOST: ${{EMAIL_SMTP_HOST}}
-  EMAIL_SMTP_PORT: ${{EMAIL_SMTP_PORT}}
-  EMAIL_USERNAME: ${{EMAIL_USERNAME}}
-  EMAIL_PASSWORD: ${{EMAIL_PASSWORD}}
+name: multivendor-service
+description: Multivendor management service for dairy and vegetable delivery platform
+version: 1.0.0
+
+# Wasmer deployment configuration
+runtime: php
+php_version: 8.1
+
+# Application entry point
+entrypoint: app/index.php
+
+# Environment variables
+env_variables:
+  # Database configuration
+  DB_HOST: ${DB_HOST}
+  DB_PORT: ${DB_PORT:-3306}
+  DB_NAME: ${DB_NAME:-multivendor_db}
+  DB_USERNAME: ${DB_USERNAME}
+  DB_PASSWORD: ${DB_PASSWORD}
   
-capabilities:
-  database:
-    engine: mysql
+  # Admin credentials
+  ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+  ADMIN_SESSION_TIMEOUT: ${ADMIN_SESSION_TIMEOUT:-3600}
+  
+  # Service URLs for migration orchestration
+  AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://localhost:8001}
+  PAY_SERVICE_URL: ${PAY_SERVICE_URL:-http://localhost:8002}
+  SOCIAL_SERVICE_URL: ${SOCIAL_SERVICE_URL:-http://localhost:8003}
+  DELIVERY_SERVICE_URL: ${DELIVERY_SERVICE_URL:-http://localhost:8004}
+  
+  # Application configuration
+  APP_ENV: ${APP_ENV:-production}
+  APP_DEBUG: ${APP_DEBUG:-false}
+  APP_NAME: "Multivendor Service"
+  APP_VERSION: "1.0.0"
+  
+  # Logging configuration
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_PATH: ${LOG_PATH:-/tmp/logs}
+  
+  # Security configuration
+  SESSION_SECURE: ${SESSION_SECURE:-true}
+  SESSION_HTTPONLY: ${SESSION_HTTPONLY:-true}
+  SESSION_SAMESITE: ${SESSION_SAMESITE:-Strict}
+  
+  # Performance configuration
+  MEMORY_LIMIT: ${MEMORY_LIMIT:-256M}
+  MAX_EXECUTION_TIME: ${MAX_EXECUTION_TIME:-300}
+  
+  # External service configuration
+  FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+  FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY}
+  SMS_API_KEY: ${SMS_API_KEY}
+  EMAIL_SMTP_HOST: ${EMAIL_SMTP_HOST}
+  EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-587}
+  EMAIL_SMTP_USERNAME: ${EMAIL_SMTP_USERNAME}
+  EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD}
+
+# Resource limits
+resources:
+  memory: 512Mi
+  cpu: 500m
+
+# Health check configuration
+health_check:
+  path: /health
+  interval: 30s
+  timeout: 10s
+  retries: 3
+
+# Scaling configuration
 scaling:
-  mode: single_concurrency
-kind: wasmer.io/App.v0
-# files:
-# - '.env'
+  min_instances: 1
+  max_instances: 5
+  target_cpu_utilization: 70
+
+# Network configuration
+network:
+  ports:
+    - port: 8080
+      protocol: HTTP
+  
+# File system configuration
+volumes:
+  - name: logs
+    path: /tmp/logs
+    size: 1Gi
+  - name: uploads
+    path: /tmp/uploads
+    size: 2Gi
+
+# Build configuration
+build:
+  commands:
+    - composer install --no-dev --optimize-autoloader
+    - php app/migrate.php --check-only
+  
+# Deployment hooks
+hooks:
+  pre_deploy:
+    - echo "Starting deployment of Multivendor Service v1.0.0"
+    - php app/migrate.php --dry-run
+  
+  post_deploy:
+    - echo "Multivendor Service deployed successfully"
+    - php app/migrate.php --verify
+    - curl -f http://localhost:8080/health || exit 1
+
+# Security configuration
+security:
+  # Enable HTTPS redirect
+  force_https: true
+  
+  # Security headers
+  headers:
+    X-Frame-Options: DENY
+    X-Content-Type-Options: nosniff
+    X-XSS-Protection: "1; mode=block"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+    Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline' cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' cdnjs.cloudflare.com; font-src 'self' cdnjs.cloudflare.com"
+
+# Monitoring and observability
+monitoring:
+  metrics:
+    enabled: true
+    path: /metrics
+  
+  logging:
+    level: INFO
+    format: json
+    
+  tracing:
+    enabled: true
+    sample_rate: 0.1
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 30  # Keep backups for 30 days

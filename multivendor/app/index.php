@@ -44,7 +44,10 @@ ErrorHandlingHelper::withLogging(function() use ($config) {
         }
 
         // Load route files
-        if (strpos($uri, '/api/vendors') === 0) {
+        if (strpos($uri, '/admin') === 0) {
+            require_once __DIR__ . '/Routes/AdminRoutes.php';
+            return null; // Route file handles response
+        } elseif (strpos($uri, '/api/vendors') === 0) {
             require_once __DIR__ . '/Routes/VendorRoutes.php';
             return null; // Route file handles response
         } elseif (strpos($uri, '/api/products') === 0) {

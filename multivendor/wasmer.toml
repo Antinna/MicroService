@@ -1,13 +1,134 @@
+[package]
+name = "multivendor-service"
+version = "1.0.0"
+description = "Multivendor management service for dairy and vegetable delivery platform"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/Antinna/MultiVendor"
+homepage = "https://github.com/Antinna/MultiVendor"
+keywords = ["php", "microservice", "multivendor", "delivery", "dairy", "vegetables"]
+
+[[package.authors]]
+name = "Manishmg3994"
+email = "manishgautammg7@gmail.com"
+
 [dependencies]
-"php/php" = "=8.3.401"
+php = "8.1"
 
 [fs]
-"/app" = "app"
-"/config" = "config" 
+# Map the app directory to the container
+"app" = "app"
+"config" = "config"
 
-[[command]]
-name = "run"
-module = "php/php:php"
-runner = "wasi"
-[command.annotations.wasi]
-main-args = ["-t", "/app", "-S", "localhost:8080"]
+[env]
+# Default environment variables
+APP_ENV = "production"
+APP_DEBUG = "false"
+APP_NAME = "Multivendor Service"
+APP_VERSION = "1.0.0"
+
+# Database defaults (will be overridden by deployment)
+DB_HOST = "localhost"
+DB_PORT = "3306"
+DB_NAME = "multivendor_db"
+
+# Admin defaults
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "admin"
+ADMIN_SESSION_TIMEOUT = "3600"
+
+# Service URLs (will be overridden by deployment)
+AUTH_SERVICE_URL = "http://localhost:8001"
+PAY_SERVICE_URL = "http://localhost:8002"
+SOCIAL_SERVICE_URL = "http://localhost:8003"
+DELIVERY_SERVICE_URL = "http://localhost:8004"
+
+# Logging
+LOG_LEVEL = "INFO"
+LOG_PATH = "/tmp/logs"
+
+# Performance
+MEMORY_LIMIT = "256M"
+MAX_EXECUTION_TIME = "300"
+
+[command]
+name = "multivendor-service"
+runner = "https://webc.org/runner/php"
+annotations.wasi.main-args = ["/app/index.php"]
+
+# Health check command
+[[command.annotations.wasi.health-check]]
+command = ["php", "/app/health-check.php"]
+interval = "30s"
+timeout = "10s"
+retries = 3
+
+[build]
+# Build commands to run during deployment
+commands = [
+    "composer install --no-dev --optimize-autoloader --working-dir=/app",
+    "php /app/migrate.php --check-only"
+]
+
+[deploy]
+# Deployment configuration
+strategy = "rolling"
+max_unavailable = 1
+max_surge = 1
+
+# Pre-deployment checks
+pre_deploy = [
+    "php /app/migrate.php --dry-run",
+    "php /app/health-check.php"
+]
+
+# Post-deployment verification
+post_deploy = [
+    "php /app/migrate.php --verify",
+    "curl -f http://localhost:8080/health"
+]
+
+[scaling]
+# Auto-scaling configuration
+min_replicas = 1
+max_replicas = 5
+target_cpu = 70
+target_memory = 80
+
+[networking]
+# Network configuration
+ports = [8080]
+protocol = "http"
+
+[volumes]
+# Persistent volumes
+logs = { path = "/tmp/logs", size = "1Gi" }
+uploads = { path = "/tmp/uploads", size = "2Gi" }
+cache = { path = "/tmp/cache", size = "512Mi" }
+
+[security]
+# Security configuration
+run_as_user = "www-data"
+run_as_group = "www-data"
+read_only_root_filesystem = false
+allow_privilege_escalation = false
+
+[monitoring]
+# Monitoring and observability
+metrics_enabled = true
+metrics_path = "/metrics"
+health_check_path = "/health"
+ready_check_path = "/ready"
+
+[logging]
+# Logging configuration
+level = "info"
+format = "json"
+output = "stdout"
+
+[resources]
+# Resource limits and requests
+memory_limit = "512Mi"
+memory_request = "256Mi"
+cpu_limit = "500m"
+cpu_request = "250m"
