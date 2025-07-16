@@ -5,6 +5,9 @@ namespace Antinna\MultiVendor\Services;
 use Antinna\MultiVendor\Interfaces\ServiceInterface;
 use Antinna\MultiVendor\Repositories\VendorRepository;
 use Antinna\MultiVendor\Services\KYCValidator;
+use Antinna\Multivendor\Services\Logger;
+use Antinna\Multivendor\Exceptions\ValidationException;
+use Antinna\Multivendor\Exceptions\ConflictException;
 use Exception;
 
 /**
@@ -14,11 +17,13 @@ class VendorRegistrationService implements ServiceInterface
 {
     private VendorRepository $vendorRepository;
     private KYCValidator $kycValidator;
+    private Logger $logger;
 
-    public function __construct()
+    public function __construct(Logger $logger = null)
     {
         $this->vendorRepository = new VendorRepository();
         $this->kycValidator = new KYCValidator();
+        $this->logger = $logger ?? new Logger();
     }
 
     /**
@@ -120,14 +125,19 @@ class VendorRegistrationService implements ServiceInterface
      */
     public function process(array $data): array
     {
+        $this->logger->info('Starting vendor registration process', [
+            'business_name' => $data['business_name'] ?? 'unknown',
+            'business_type' => $data['business_type'] ?? 'unknown'
+        ]);
+
         try {
             // Validate input data
             $validation = $this->validate($data);
             if (!$validation['valid']) {
-                return [
-                    'success' => false,
+                $this->logger->warning('Vendor registration validation failed', [
                     'errors' => $validation['errors']
-                ];
+                ]);
+                throw new ValidationException($validation['errors']);
             }
 
             // Prepare vendor data
@@ -145,8 +155,22 @@ class VendorRegistrationService implements ServiceInterface
                 'status' => 'pending' // All new vendors start as pending
             ];
 
+            // Check for existing vendor with same email or FSSAI license
+            if ($this->isEmailExists($vendorData['email'])) {
+                throw new ConflictException('Vendor', 'Email already registered with another vendor');
+            }
+            
+            if ($this->isFSSAILicenseExists($vendorData['fssai_license'])) {
+                throw new ConflictException('Vendor', 'FSSAI license already registered with another vendor');
+            }
+
             // Create vendor record
             $vendorId = $this->vendorRepository->create($vendorData);
+            
+            $this->logger->info('Vendor registration successful', [
+                'vendor_id' => $vendorId,
+                'business_name' => $vendorData['business_name']
+            ]);
 
             // Process KYC documents if provided
             $documentsProcessed = [];
@@ -162,11 +186,22 @@ class VendorRegistrationService implements ServiceInterface
                 'documents_processed' => $documentsProcessed
             ];
 
+        } catch (ValidationException $e) {
+            $this->logger->warning('Vendor registration validation failed', [
+                'errors' => $e->getErrors()
+            ]);
+            throw $e;
+        } catch (ConflictException $e) {
+            $this->logger->warning('Vendor registration conflict', [
+                'message' => $e->getMessage()
+            ]);
+            throw $e;
         } catch (Exception $e) {
-            return [
-                'success' => false,
-                'error' => 'Registration failed: ' . $e->getMessage()
-            ];
+            $this->logger->error('Vendor registration failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new \RuntimeException('Registration failed: ' . $e->getMessage(), 0, $e);
         }
     }
 
