@@ -35,38 +35,36 @@ jobs:
           set -e
           echo "🔍 Discovering microservices..."
 
+          root_dir=$(pwd)
+
           pids=()
           services=()
 
           for dir in */; do
-            clean_dir="${dir%/}"  # remove trailing slash
+            clean_dir="${dir%/}"
             wasmer_toml="${clean_dir}/wasmer.toml"
 
             if [[ -f "$wasmer_toml" ]]; then
               echo "🚀 Starting deploy for $clean_dir..."
 
               (
-                # Check and install PHP dependencies
-                if [[ -f "${clean_dir}/app/composer.json" ]]; then
+                if [[ -f "${root_dir}/${clean_dir}/app/composer.json" ]]; then
                   echo "📦 Installing PHP dependencies in ${clean_dir}/app..."
-                  cd "${clean_dir}/app" || { echo "❌ [${clean_dir}] app folder missing"; exit 1; }
+                  cd "${root_dir}/${clean_dir}/app" || { echo "❌ [${clean_dir}] app folder missing"; exit 1; }
                   composer install --prefer-dist
                   composer dump-autoload --optimize
-                  cd ../
                 fi
 
-                # Deploy with Wasmer
-                cd "$clean_dir" || { echo "❌ [${clean_dir}] folder missing"; exit 1; }
+                cd "${root_dir}/${clean_dir}" || { echo "❌ [${clean_dir}] folder missing"; exit 1; }
                 echo "⚙️ Running wasmer deploy in $clean_dir..."
                 wasmer deploy --token=${{ secrets.WASMER_TOKEN }} --non-interactive --no-wait --no-persist-id
               ) &
-              
+
               pids+=($!)
               services+=("$clean_dir")
             fi
           done
 
-          # Wait for each deploy
           exit_code=0
           for i in "${!pids[@]}"; do
             pid="${pids[$i]}"
