@@ -894,44 +894,44 @@ class AdminController
             const historyDiv = document.getElementById("migrationHistory");
             
             if (migrations.length === 0) {
-                historyDiv.innerHTML = `<div class="alert alert-info">No migrations have been run yet</div>`;
+                historyDiv.innerHTML = "<div class=\\"alert alert-info\\">No migrations have been run yet</div>";
                 return;
             }
             
-            let html = '<div class="migration-history">';
+            let html = "<div class=\\"migration-history\\">";
             
-            migrations.slice(0, 10).forEach(migration => {
-                const statusClass = `status-${migration.status}`;
+            migrations.slice(0, 10).forEach(function(migration) {
+                const statusClass = "status-" + migration.status;
                 const date = new Date(migration.started_at * 1000).toLocaleString();
+                const notesHtml = migration.options && migration.options.notes ? "<br><small>" + migration.options.notes + "</small>" : "";
+                const progressHtml = migration.status === "running" ? "<br><small>" + migration.completed_services + "/" + migration.total_services + " completed</small>" : "";
                 
-                html += `
-                    <div class="history-item">
-                        <div>
-                            <strong>Migration ${migration.id.substring(0, 8)}...</strong><br>
-                            <small>${date}</small>
-                            ${migration.options && migration.options.notes ? `<br><small>${migration.options.notes}</small>` : ''}
-                        </div>
-                        <div>
-                            <span class="status-badge ${statusClass}">${migration.status.toUpperCase()}</span>
-                            ${migration.status === 'running' ? `<br><small>${migration.completed_services}/${migration.total_services} completed</small>` : ''}
-                        </div>
-                    </div>
-                `;
+                html += 
+                    "<div class=\\"history-item\\">" +
+                    "<div>" +
+                    "<strong>Migration " + migration.id.substring(0, 8) + "...</strong><br>" +
+                    "<small>" + date + "</small>" +
+                    notesHtml +
+                    "</div>" +
+                    "<div>" +
+                    "<span class=\\"status-badge " + statusClass + "\\">" + migration.status.toUpperCase() + "</span>" +
+                    progressHtml +
+                    "</div>" +
+                    "</div>";
             });
             
-            html += '</div>';
+            html += "</div>";
             historyDiv.innerHTML = html;
         }
 
         async function loadSystemInfo() {
             // This would load system information - for now just show placeholder
             const systemInfoDiv = document.getElementById("systemInfo");
-            systemInfoDiv.innerHTML = `
-                <p><strong>PHP Version:</strong> ${navigator.userAgent.includes('PHP') ? 'PHP 8.1+' : 'Unknown'}</p>
-                <p><strong>Platform:</strong> Wasmer.io</p>
-                <p><strong>Services:</strong> 5 microservices</p>
-                <p><strong>Status:</strong> Operational</p>
-            `;
+            systemInfoDiv.innerHTML = 
+                "<p><strong>PHP Version:</strong> " + (navigator.userAgent.includes(\\"PHP\\") ? \\"PHP 8.1+\\" : \\"Unknown\\") + "</p>" +
+                "<p><strong>Platform:</strong> Wasmer.io</p>" +
+                "<p><strong>Services:</strong> 5 microservices</p>" +
+                "<p><strong>Status:</strong> Operational</p>";
         }
 
         // Utility functions
@@ -939,17 +939,20 @@ class AdminController
             const alertsDiv = document.getElementById("alerts");
             const alertId = "alert-" + Date.now();
             
-            const alertHtml = `
-                <div id="${alertId}" class="alert alert-${type}">
-                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'danger' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
-                    ${message}
-                </div>
-            `;
+            const iconClass = type === "success" ? "check-circle" : 
+                             type === "danger" ? "exclamation-circle" : 
+                             type === "warning" ? "exclamation-triangle" : "info-circle";
+            
+            const alertHtml = 
+                "<div id=\\"" + alertId + "\\" class=\\"alert alert-" + type + "\\"> " +
+                "<i class=\\"fas fa-" + iconClass + "\\"></i> " +
+                message +
+                "</div>";
             
             alertsDiv.innerHTML = alertHtml + alertsDiv.innerHTML;
             
             // Auto-remove after 5 seconds
-            setTimeout(() => {
+            setTimeout(function() {
                 const alertElement = document.getElementById(alertId);
                 if (alertElement) {
                     alertElement.remove();

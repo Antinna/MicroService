@@ -227,7 +227,7 @@ class WebSocketHandler
             }
             
             connect() {
-                const url = `/admin/migration/progress/${this.migrationId}/stream`;
+                const url = `/admin/migration/progress/$migrationId/stream`;
                 this.eventSource = new EventSource(url);
                 
                 this.eventSource.onopen = () => {
