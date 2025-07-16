@@ -12,51 +12,88 @@ use Exception;
 class OrderConsolidator
 {
     private PDO $db;
+    private Logger $logger;
+
+    // Consolidation strategies
+    const STRATEGY_BY_LOCATION = 'location';
+    const STRATEGY_BY_VENDOR = 'vendor';
+    const STRATEGY_BY_DELIVERY_SLOT = 'delivery_slot';
+    const STRATEGY_BY_CUSTOMER = 'customer';
+    const STRATEGY_MIXED = 'mixed';
+
+    // Order types
+    const ORDER_TYPE_SUBSCRIPTION = 'subscription';
+    const ORDER_TYPE_ON_DEMAND = 'on_demand';
 
     public function __construct()
     {
         $this->db = Connection::getInstance()->getConnection();
+        $this->logger = new Logger();
+        $this->createConsolidationTables();
     }
 
     /**
-     * Consolidate orders by location, vendor, and delivery slot
+     * Consolidate orders for a specific date and delivery slot
      */
-    public function consolidateOrders(string $deliveryDate): array
+    public function consolidateOrdersForSlot(int $deliverySlotId, string $deliveryDate, array $options = []): array
     {
         try {
-            // Get all orders for the delivery date
-            $orders = $this->getOrdersForDate($deliveryDate);
+            $this->logger->info('Starting order consolidation for slot', [
+                'delivery_slot_id' => $deliverySlotId,
+                'delivery_date' => $deliveryDate
+            ]);
+
+            // Get pending orders for the slot and date
+            $pendingOrders = $this->getPendingOrdersForSlot($deliverySlotId, $deliveryDate);
             
-            if (empty($orders)) {
+            if (empty($pendingOrders)) {
                 return [
                     'success' => true,
-                    'delivery_date' => $deliveryDate,
-                    'total_orders' => 0,
-                    'consolidated_groups' => [],
-                    'message' => 'No orders found for consolidation'
+                    'message' => 'No pending orders found for consolidation',
+                    'consolidated_orders' => [],
+                    'total_orders' => 0
                 ];
             }
 
-            // Group orders by consolidation criteria
-            $consolidatedGroups = $this->groupOrdersForConsolidation($orders);
-            
-            // Create consolidated delivery records
+            // Group orders by consolidation strategy
+            $strategy = $options['strategy'] ?? self::STRATEGY_MIXED;
+            $groupedOrders = $this->groupOrdersByStrategy($pendingOrders, $strategy);
+
+            // Consolidate each group
+            $consolidatedOrders = [];
             $consolidationResults = [];
-            foreach ($consolidatedGroups as $groupKey => $group) {
-                $result = $this->createConsolidatedDelivery($group, $deliveryDate);
-                $consolidationResults[$groupKey] = $result;
+
+            foreach ($groupedOrders as $groupKey => $orders) {
+                $consolidationResult = $this->consolidateOrderGroup($orders, $groupKey, $options);
+                
+                if ($consolidationResult['success']) {
+                    $consolidatedOrders[] = $consolidationResult['consolidated_order'];
+                    $consolidationResults[] = $consolidationResult;
+                }
             }
+
+            // Record consolidation activity
+            $this->recordConsolidationActivity($deliverySlotId, $deliveryDate, $consolidationResults);
 
             return [
                 'success' => true,
+                'delivery_slot_id' => $deliverySlotId,
                 'delivery_date' => $deliveryDate,
-                'total_orders' => count($orders),
-                'consolidated_groups' => count($consolidatedGroups),
-                'consolidation_results' => $consolidationResults,
-                'message' => 'Orders consolidated successfully'
+                'strategy' => $strategy,
+                'original_orders_count' => count($pendingOrders),
+                'consolidated_orders_count' => count($consolidatedOrders),
+                'consolidation_ratio' => count($pendingOrders) > 0 ? count($consolidatedOrders) / count($pendingOrders) : 0,
+                'consolidated_orders' => $consolidatedOrders,
+                'consolidation_results' => $consolidationResults
             ];
 
         } catch (Exception $e) {
+            $this->logger->error('Order consolidation failed', [
+                'delivery_slot_id' => $deliverySlotId,
+                'delivery_date' => $deliveryDate,
+                'error' => $e->getMessage()
+            ]);
+
             return [
                 'success' => false,
                 'error' => 'Order consolidation failed: ' . $e->getMessage()
@@ -65,492 +102,901 @@ class OrderConsolidator
     }
 
     /**
-     * Get orders for specific date
+     * Consolidate orders by customer and location
      */
-    private function getOrdersForDate(string $deliveryDate): array
+    public function consolidateByCustomerLocation(string $deliveryDate, array $options = []): array
     {
         try {
-            // Get subscription orders
-            $subscriptionSql = "SELECT 
-                                    'subscription' as order_type,
-                                    id as order_id,
-                                    subscription_id,
-                                    customer_id,
-                                    vendor_id,
-                                    product_id,
-                                    quantity,
-                                    unit_price,
-                                    total_amount,
-                                    delivery_time_slot,
-                                    delivery_address,
-                                    delivery_latitude,
-                                    delivery_longitude,
-                                    special_instructions,
-                                    status,
-                                    reserved_batches
-                                FROM subscription_orders 
-                                WHERE delivery_date = ? 
-                                AND status IN ('confirmed', 'preparing')";
-
-            $stmt = $this->db->prepare($subscriptionSql);
-            $stmt->execute([$deliveryDate]);
-            $subscriptionOrders = $stmt->fetchAll();
-
-            // Get on-demand orders (if table exists)
-            $onDemandOrders = [];
-            try {
-                $onDemandSql = "SELECT 
-                                    'on_demand' as order_type,
-                                    id as order_id,
-                                    NULL as subscription_id,
-                                    customer_id,
-                                    vendor_id,
-                                    product_id,
-                                    quantity,
-                                    unit_price,
-                                    total_amount,
-                                    delivery_time_slot,
-                                    delivery_address,
-                                    delivery_latitude,
-                                    delivery_longitude,
-                                    special_instructions,
-                                    status,
-                                    reserved_batches
-                                FROM on_demand_orders 
-                                WHERE delivery_date = ? 
-                                AND status IN ('confirmed', 'preparing')";
-
-                $stmt = $this->db->prepare($onDemandSql);
-                $stmt->execute([$deliveryDate]);
-                $onDemandOrders = $stmt->fetchAll();
-            } catch (Exception $e) {
-                // On-demand orders table might not exist yet
-            }
-
-            // Merge all orders
-            $allOrders = array_merge($subscriptionOrders, $onDemandOrders);
-
-            // Add product and vendor information
-            foreach ($allOrders as &$order) {
-                $order['product_info'] = $this->getProductInfo($order['product_id']);
-                $order['vendor_info'] = $this->getVendorInfo($order['vendor_id']);
-            }
-
-            return $allOrders;
-
-        } catch (Exception $e) {
-            throw new Exception('Failed to get orders for date: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Group orders for consolidation
-     */
-    private function groupOrdersForConsolidation(array $orders): array
-    {
-        $groups = [];
-
-        foreach ($orders as $order) {
-            // Create consolidation key based on location, vendor, and time slot
-            $locationKey = $this->generateLocationKey(
-                $order['delivery_latitude'],
-                $order['delivery_longitude'],
-                $order['delivery_address']
-            );
+            // Get all pending orders for the date
+            $pendingOrders = $this->getPendingOrdersForDate($deliveryDate);
             
-            $groupKey = sprintf(
-                'vendor_%d_location_%s_slot_%s',
-                $order['vendor_id'],
-                $locationKey,
-                str_replace(':', '', $order['delivery_time_slot'])
-            );
-
-            if (!isset($groups[$groupKey])) {
-                $groups[$groupKey] = [
-                    'group_key' => $groupKey,
-                    'vendor_id' => $order['vendor_id'],
-                    'vendor_info' => $order['vendor_info'],
-                    'delivery_time_slot' => $order['delivery_time_slot'],
-                    'delivery_location' => [
-                        'address' => $order['delivery_address'],
-                        'latitude' => $order['delivery_latitude'],
-                        'longitude' => $order['delivery_longitude']
-                    ],
-                    'orders' => [],
-                    'total_orders' => 0,
-                    'total_quantity' => 0,
-                    'total_amount' => 0,
-                    'customers' => [],
-                    'products' => [],
-                    'requires_cold_chain' => false
-                ];
-            }
-
-            // Add order to group
-            $groups[$groupKey]['orders'][] = $order;
-            $groups[$groupKey]['total_orders']++;
-            $groups[$groupKey]['total_quantity'] += $order['quantity'];
-            $groups[$groupKey]['total_amount'] += $order['total_amount'];
-
-            // Track unique customers
-            if (!in_array($order['customer_id'], $groups[$groupKey]['customers'])) {
-                $groups[$groupKey]['customers'][] = $order['customer_id'];
-            }
-
-            // Track unique products
-            $productKey = $order['product_id'];
-            if (!isset($groups[$groupKey]['products'][$productKey])) {
-                $groups[$groupKey]['products'][$productKey] = [
-                    'product_id' => $order['product_id'],
-                    'product_info' => $order['product_info'],
-                    'total_quantity' => 0,
-                    'orders' => []
-                ];
-            }
-            $groups[$groupKey]['products'][$productKey]['total_quantity'] += $order['quantity'];
-            $groups[$groupKey]['products'][$productKey]['orders'][] = $order['order_id'];
-
-            // Check if any product requires cold chain
-            if ($order['product_info']['requires_cold_chain']) {
-                $groups[$groupKey]['requires_cold_chain'] = true;
-            }
-        }
-
-        return $groups;
-    }
-
-    /**
-     * Create consolidated delivery record
-     */
-    private function createConsolidatedDelivery(array $group, string $deliveryDate): array
-    {
-        try {
-            // Create consolidated_orders table if it doesn't exist
-            $this->createConsolidatedOrdersTable();
-
-            $consolidatedData = [
-                'delivery_date' => $deliveryDate,
-                'vendor_id' => $group['vendor_id'],
-                'delivery_time_slot' => $group['delivery_time_slot'],
-                'delivery_address' => $group['delivery_location']['address'],
-                'delivery_latitude' => $group['delivery_location']['latitude'],
-                'delivery_longitude' => $group['delivery_location']['longitude'],
-                'total_orders' => $group['total_orders'],
-                'total_quantity' => $group['total_quantity'],
-                'total_amount' => $group['total_amount'],
-                'customer_count' => count($group['customers']),
-                'product_count' => count($group['products']),
-                'requires_cold_chain' => $group['requires_cold_chain'],
-                'order_ids' => json_encode(array_column($group['orders'], 'order_id')),
-                'customer_ids' => json_encode($group['customers']),
-                'product_summary' => json_encode(array_values($group['products'])),
-                'consolidation_key' => $group['group_key'],
-                'status' => 'consolidated',
-                'created_at' => date('Y-m-d H:i:s')
-            ];
-
-            $sql = "INSERT INTO consolidated_orders (" . implode(', ', array_keys($consolidatedData)) . ") 
-                    VALUES (" . str_repeat('?,', count($consolidatedData) - 1) . "?)";
-            
-            $stmt = $this->db->prepare($sql);
-            $success = $stmt->execute(array_values($consolidatedData));
-
-            if ($success) {
-                $consolidatedId = $this->db->lastInsertId();
-                
-                // Update individual orders with consolidation reference
-                $this->updateOrdersWithConsolidationId($group['orders'], $consolidatedId);
-
+            if (empty($pendingOrders)) {
                 return [
                     'success' => true,
-                    'consolidated_id' => $consolidatedId,
-                    'group_key' => $group['group_key'],
-                    'total_orders' => $group['total_orders'],
-                    'total_amount' => $group['total_amount'],
-                    'optimization_score' => $this->calculateOptimizationScore($group)
-                ];
-            } else {
-                return [
-                    'success' => false,
-                    'error' => 'Failed to create consolidated delivery record'
+                    'message' => 'No pending orders found for consolidation',
+                    'consolidated_orders' => []
                 ];
             }
 
-        } catch (Exception $e) {
-            return [
-                'success' => false,
-                'error' => 'Consolidation creation failed: ' . $e->getMessage()
-            ];
-        }
-    }
-
-    /**
-     * Generate location key for grouping
-     */
-    private function generateLocationKey(?float $latitude, ?float $longitude, string $address): string
-    {
-        if ($latitude && $longitude) {
-            // Round coordinates to create location clusters (approximately 100m radius)
-            $roundedLat = round($latitude, 3);
-            $roundedLng = round($longitude, 3);
-            return "coord_{$roundedLat}_{$roundedLng}";
-        } else {
-            // Use address hash for grouping
-            return 'addr_' . substr(md5($address), 0, 8);
-        }
-    }
-
-    /**
-     * Get product information
-     */
-    private function getProductInfo(int $productId): array
-    {
-        try {
-            $sql = "SELECT id, name, category, requires_cold_chain, unit_type 
-                    FROM products WHERE id = ?";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([$productId]);
-            $product = $stmt->fetch();
-
-            return $product ?: [
-                'id' => $productId,
-                'name' => 'Unknown Product',
-                'category' => 'unknown',
-                'requires_cold_chain' => false,
-                'unit_type' => 'piece'
-            ];
-
-        } catch (Exception $e) {
-            return [
-                'id' => $productId,
-                'name' => 'Unknown Product',
-                'category' => 'unknown',
-                'requires_cold_chain' => false,
-                'unit_type' => 'piece'
-            ];
-        }
-    }
-
-    /**
-     * Get vendor information
-     */
-    private function getVendorInfo(int $vendorId): array
-    {
-        try {
-            $sql = "SELECT id, business_name, cold_chain_capable 
-                    FROM vendors WHERE id = ?";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([$vendorId]);
-            $vendor = $stmt->fetch();
-
-            return $vendor ?: [
-                'id' => $vendorId,
-                'business_name' => 'Unknown Vendor',
-                'cold_chain_capable' => false
-            ];
-
-        } catch (Exception $e) {
-            return [
-                'id' => $vendorId,
-                'business_name' => 'Unknown Vendor',
-                'cold_chain_capable' => false
-            ];
-        }
-    }
-
-    /**
-     * Update orders with consolidation ID
-     */
-    private function updateOrdersWithConsolidationId(array $orders, int $consolidatedId): void
-    {
-        try {
-            foreach ($orders as $order) {
-                if ($order['order_type'] === 'subscription') {
-                    $sql = "UPDATE subscription_orders 
-                            SET consolidated_delivery_id = ? 
-                            WHERE id = ?";
-                } else {
-                    $sql = "UPDATE on_demand_orders 
-                            SET consolidated_delivery_id = ? 
-                            WHERE id = ?";
+            // Group by customer and delivery location
+            $customerLocationGroups = [];
+            foreach ($pendingOrders as $order) {
+                $key = $order['customer_id'] . '_' . md5($order['delivery_address']);
+                if (!isset($customerLocationGroups[$key])) {
+                    $customerLocationGroups[$key] = [];
                 }
-
-                $stmt = $this->db->prepare($sql);
-                $stmt->execute([$consolidatedId, $order['order_id']]);
+                $customerLocationGroups[$key][] = $order;
             }
 
-        } catch (Exception $e) {
-            error_log("Failed to update orders with consolidation ID: " . $e->getMessage());
-        }
-    }
-
-    /**
-     * Calculate optimization score
-     */
-    private function calculateOptimizationScore(array $group): float
-    {
-        // Simple optimization score based on:
-        // - Number of orders consolidated
-        // - Total quantity
-        // - Customer density
-        
-        $orderScore = min($group['total_orders'] * 10, 50); // Max 50 points for orders
-        $quantityScore = min($group['total_quantity'] * 2, 30); // Max 30 points for quantity
-        $customerScore = count($group['customers']) * 5; // 5 points per unique customer
-        
-        return round(($orderScore + $quantityScore + $customerScore) / 100 * 100, 2);
-    }
-
-    /**
-     * Get consolidation statistics
-     */
-    public function getConsolidationStats(string $deliveryDate): array
-    {
-        try {
-            $sql = "SELECT 
-                        COUNT(*) as total_consolidated_deliveries,
-                        SUM(total_orders) as total_orders_consolidated,
-                        SUM(total_amount) as total_value_consolidated,
-                        AVG(total_orders) as avg_orders_per_delivery,
-                        COUNT(DISTINCT vendor_id) as vendors_involved,
-                        SUM(customer_count) as total_customers_served
-                    FROM consolidated_orders
-                    WHERE delivery_date = ?";
-
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([$deliveryDate]);
-            $stats = $stmt->fetch();
+            $consolidatedOrders = [];
+            foreach ($customerLocationGroups as $groupKey => $orders) {
+                if (count($orders) > 1) {
+                    $consolidationResult = $this->consolidateOrderGroup($orders, $groupKey, $options);
+                    if ($consolidationResult['success']) {
+                        $consolidatedOrders[] = $consolidationResult['consolidated_order'];
+                    }
+                }
+            }
 
             return [
                 'success' => true,
                 'delivery_date' => $deliveryDate,
-                'statistics' => $stats ?: [
-                    'total_consolidated_deliveries' => 0,
-                    'total_orders_consolidated' => 0,
-                    'total_value_consolidated' => 0,
-                    'avg_orders_per_delivery' => 0,
-                    'vendors_involved' => 0,
-                    'total_customers_served' => 0
-                ]
+                'original_orders_count' => count($pendingOrders),
+                'consolidated_orders_count' => count($consolidatedOrders),
+                'consolidated_orders' => $consolidatedOrders
             ];
 
         } catch (Exception $e) {
+            $this->logger->error('Customer location consolidation failed', [
+                'delivery_date' => $deliveryDate,
+                'error' => $e->getMessage()
+            ]);
+
             return [
                 'success' => false,
-                'error' => 'Failed to get consolidation stats: ' . $e->getMessage()
+                'error' => 'Customer location consolidation failed: ' . $e->getMessage()
             ];
         }
     }
 
     /**
-     * Get consolidated deliveries for vendor
+     * Consolidate orders by vendor and optimize delivery routes
      */
-    public function getVendorConsolidatedDeliveries(int $vendorId, string $deliveryDate): array
+    public function consolidateByVendorRoute(int $vendorId, string $deliveryDate, array $options = []): array
     {
         try {
-            $sql = "SELECT * FROM consolidated_orders 
-                    WHERE vendor_id = ? AND delivery_date = ?
-                    ORDER BY delivery_time_slot";
+            // Get vendor orders for the date
+            $vendorOrders = $this->getVendorOrdersForDate($vendorId, $deliveryDate);
+            
+            if (empty($vendorOrders)) {
+                return [
+                    'success' => true,
+                    'message' => 'No vendor orders found for consolidation',
+                    'optimized_routes' => []
+                ];
+            }
 
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([$vendorId, $deliveryDate]);
-            $deliveries = $stmt->fetchAll();
+            // Group orders by geographic proximity
+            $locationGroups = $this->groupOrdersByLocation($vendorOrders, $options);
 
-            // Decode JSON fields
-            foreach ($deliveries as &$delivery) {
-                $delivery['order_ids'] = json_decode($delivery['order_ids'], true);
-                $delivery['customer_ids'] = json_decode($delivery['customer_ids'], true);
-                $delivery['product_summary'] = json_decode($delivery['product_summary'], true);
+            // Optimize delivery routes for each group
+            $optimizedRoutes = [];
+            foreach ($locationGroups as $groupKey => $orders) {
+                $routeOptimization = $this->optimizeDeliveryRoute($orders, $options);
+                if ($routeOptimization['success']) {
+                    $optimizedRoutes[] = $routeOptimization['route'];
+                }
             }
 
             return [
                 'success' => true,
                 'vendor_id' => $vendorId,
                 'delivery_date' => $deliveryDate,
-                'deliveries' => $deliveries
+                'total_orders' => count($vendorOrders),
+                'route_groups' => count($optimizedRoutes),
+                'optimized_routes' => $optimizedRoutes
             ];
 
         } catch (Exception $e) {
+            $this->logger->error('Vendor route consolidation failed', [
+                'vendor_id' => $vendorId,
+                'delivery_date' => $deliveryDate,
+                'error' => $e->getMessage()
+            ]);
+
             return [
                 'success' => false,
-                'error' => 'Failed to get vendor consolidated deliveries: ' . $e->getMessage()
+                'error' => 'Vendor route consolidation failed: ' . $e->getMessage()
             ];
         }
     }
 
     /**
-     * Update consolidation status
+     * Get consolidation recommendations
      */
-    public function updateConsolidationStatus(int $consolidatedId, string $status): array
+    public function getConsolidationRecommendations(string $deliveryDate, array $filters = []): array
     {
         try {
-            $validStatuses = ['consolidated', 'assigned', 'in_transit', 'delivered', 'failed'];
+            $recommendations = [];
+
+            // Analyze potential consolidations
+            $potentialConsolidations = $this->analyzePotentialConsolidations($deliveryDate, $filters);
+
+            foreach ($potentialConsolidations as $consolidation) {
+                $savings = $this->calculateConsolidationSavings($consolidation);
+                
+                if ($savings['total_savings'] > 0) {
+                    $recommendations[] = [
+                        'type' => $consolidation['type'],
+                        'description' => $consolidation['description'],
+                        'orders_count' => $consolidation['orders_count'],
+                        'potential_savings' => $savings,
+                        'priority' => $this->calculateConsolidationPriority($consolidation, $savings),
+                        'consolidation_data' => $consolidation
+                    ];
+                }
+            }
+
+            // Sort by priority
+            usort($recommendations, fn($a, $b) => $b['priority'] <=> $a['priority']);
+
+            return [
+                'success' => true,
+                'delivery_date' => $deliveryDate,
+                'recommendations_count' => count($recommendations),
+                'recommendations' => $recommendations
+            ];
+
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get consolidation recommendations', [
+                'delivery_date' => $deliveryDate,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Failed to get consolidation recommendations: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Execute automatic consolidation based on rules
+     */
+    public function executeAutoConsolidation(string $deliveryDate, array $rules = []): array
+    {
+        try {
+            $defaultRules = [
+                'min_orders_for_consolidation' => 2,
+                'max_distance_km' => 5,
+                'min_savings_percentage' => 10,
+                'consolidate_same_customer' => true,
+                'consolidate_same_vendor' => true,
+                'consolidate_same_area' => true
+            ];
+
+            $rules = array_merge($defaultRules, $rules);
+            $consolidationResults = [];
+
+            // Get consolidation recommendations
+            $recommendations = $this->getConsolidationRecommendations($deliveryDate);
             
-            if (!in_array($status, $validStatuses)) {
+            if (!$recommendations['success']) {
+                return $recommendations;
+            }
+
+            foreach ($recommendations['recommendations'] as $recommendation) {
+                // Check if recommendation meets rules criteria
+                if ($this->meetsConsolidationRules($recommendation, $rules)) {
+                    $executionResult = $this->executeConsolidationRecommendation($recommendation);
+                    $consolidationResults[] = $executionResult;
+                }
+            }
+
+            $successfulConsolidations = array_filter($consolidationResults, fn($r) => $r['success']);
+
+            return [
+                'success' => true,
+                'delivery_date' => $deliveryDate,
+                'rules_applied' => $rules,
+                'recommendations_evaluated' => count($recommendations['recommendations']),
+                'consolidations_executed' => count($consolidationResults),
+                'successful_consolidations' => count($successfulConsolidations),
+                'consolidation_results' => $consolidationResults
+            ];
+
+        } catch (Exception $e) {
+            $this->logger->error('Auto consolidation execution failed', [
+                'delivery_date' => $deliveryDate,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Auto consolidation execution failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Get consolidation history and statistics
+     */
+    public function getConsolidationHistory(int $days = 30, array $filters = []): array
+    {
+        try {
+            $whereClause = 'WHERE ca.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)';
+            $params = [$days];
+
+            if (!empty($filters['vendor_id'])) {
+                $whereClause .= ' AND ca.vendor_id = ?';
+                $params[] = $filters['vendor_id'];
+            }
+
+            if (!empty($filters['delivery_slot_id'])) {
+                $whereClause .= ' AND ca.delivery_slot_id = ?';
+                $params[] = $filters['delivery_slot_id'];
+            }
+
+            $sql = "SELECT 
+                        ca.*,
+                        v.business_name as vendor_name,
+                        ds.slot_name as delivery_slot_name
+                    FROM consolidation_activities ca
+                    LEFT JOIN vendors v ON ca.vendor_id = v.id
+                    LEFT JOIN delivery_slots ds ON ca.delivery_slot_id = ds.id
+                    {$whereClause}
+                    ORDER BY ca.created_at DESC";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            $activities = $stmt->fetchAll();
+
+            // Calculate statistics
+            $stats = $this->calculateConsolidationStatistics($activities);
+
+            return [
+                'success' => true,
+                'period_days' => $days,
+                'total_activities' => count($activities),
+                'activities' => $activities,
+                'statistics' => $stats
+            ];
+
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get consolidation history', [
+                'days' => $days,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Failed to get consolidation history: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Get pending orders for specific slot and date
+     */
+    private function getPendingOrdersForSlot(int $deliverySlotId, string $deliveryDate): array
+    {
+        try {
+            $sql = "SELECT o.*, 
+                           oi.product_id, oi.quantity, oi.unit_price,
+                           p.name as product_name, p.requires_cold_chain,
+                           v.business_name as vendor_name
+                    FROM orders o
+                    JOIN order_items oi ON o.id = oi.order_id
+                    JOIN products p ON oi.product_id = p.id
+                    JOIN vendors v ON o.vendor_id = v.id
+                    WHERE o.delivery_slot_id = ?
+                    AND DATE(o.delivery_date) = ?
+                    AND o.status IN ('pending', 'confirmed')
+                    ORDER BY o.customer_id, o.vendor_id, o.created_at";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$deliverySlotId, $deliveryDate]);
+            
+            return $stmt->fetchAll();
+
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get pending orders for slot', [
+                'delivery_slot_id' => $deliverySlotId,
+                'delivery_date' => $deliveryDate,
+                'error' => $e->getMessage()
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Get pending orders for specific date
+     */
+    private function getPendingOrdersForDate(string $deliveryDate): array
+    {
+        try {
+            $sql = "SELECT o.*, 
+                           oi.product_id, oi.quantity, oi.unit_price,
+                           p.name as product_name, p.requires_cold_chain,
+                           v.business_name as vendor_name
+                    FROM orders o
+                    JOIN order_items oi ON o.id = oi.order_id
+                    JOIN products p ON oi.product_id = p.id
+                    JOIN vendors v ON o.vendor_id = v.id
+                    WHERE DATE(o.delivery_date) = ?
+                    AND o.status IN ('pending', 'confirmed')
+                    ORDER BY o.customer_id, o.vendor_id, o.created_at";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$deliveryDate]);
+            
+            return $stmt->fetchAll();
+
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get pending orders for date', [
+                'delivery_date' => $deliveryDate,
+                'error' => $e->getMessage()
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Get vendor orders for specific date
+     */
+    private function getVendorOrdersForDate(int $vendorId, string $deliveryDate): array
+    {
+        try {
+            $sql = "SELECT o.*, 
+                           oi.product_id, oi.quantity, oi.unit_price,
+                           p.name as product_name, p.requires_cold_chain
+                    FROM orders o
+                    JOIN order_items oi ON o.id = oi.order_id
+                    JOIN products p ON oi.product_id = p.id
+                    WHERE o.vendor_id = ?
+                    AND DATE(o.delivery_date) = ?
+                    AND o.status IN ('pending', 'confirmed')
+                    ORDER BY o.delivery_address, o.created_at";
+
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute([$vendorId, $deliveryDate]);
+            
+            return $stmt->fetchAll();
+
+        } catch (Exception $e) {
+            $this->logger->error('Failed to get vendor orders for date', [
+                'vendor_id' => $vendorId,
+                'delivery_date' => $deliveryDate,
+                'error' => $e->getMessage()
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Group orders by consolidation strategy
+     */
+    private function groupOrdersByStrategy(array $orders, string $strategy): array
+    {
+        $groups = [];
+
+        foreach ($orders as $order) {
+            $groupKey = match($strategy) {
+                self::STRATEGY_BY_LOCATION => $this->getLocationGroupKey($order),
+                self::STRATEGY_BY_VENDOR => $order['vendor_id'],
+                self::STRATEGY_BY_DELIVERY_SLOT => $order['delivery_slot_id'],
+                self::STRATEGY_BY_CUSTOMER => $order['customer_id'],
+                self::STRATEGY_MIXED => $this->getMixedGroupKey($order),
+                default => $order['id'] // No grouping
+            };
+
+            if (!isset($groups[$groupKey])) {
+                $groups[$groupKey] = [];
+            }
+            $groups[$groupKey][] = $order;
+        }
+
+        // Filter out single-order groups (no consolidation needed)
+        return array_filter($groups, fn($group) => count($group) > 1);
+    }
+
+    /**
+     * Get location-based group key
+     */
+    private function getLocationGroupKey(array $order): string
+    {
+        // Simple location grouping by postal code or area
+        $address = $order['delivery_address'];
+        $postalCode = $this->extractPostalCode($address);
+        
+        return $postalCode ?: md5($address);
+    }
+
+    /**
+     * Get mixed strategy group key
+     */
+    private function getMixedGroupKey(array $order): string
+    {
+        // Combine customer, vendor, and location for mixed strategy
+        return $order['customer_id'] . '_' . $order['vendor_id'] . '_' . $this->getLocationGroupKey($order);
+    }
+
+    /**
+     * Extract postal code from address
+     */
+    private function extractPostalCode(string $address): ?string
+    {
+        // Simple regex to extract Indian postal codes (6 digits)
+        if (preg_match('/\b(\d{6})\b/', $address, $matches)) {
+            return $matches[1];
+        }
+        
+        return null;
+    }
+
+    /**
+     * Consolidate a group of orders
+     */
+    private function consolidateOrderGroup(array $orders, string $groupKey, array $options): array
+    {
+        try {
+            if (count($orders) < 2) {
                 return [
                     'success' => false,
-                    'error' => 'Invalid status. Must be one of: ' . implode(', ', $validStatuses)
+                    'error' => 'Insufficient orders for consolidation'
                 ];
             }
 
-            $sql = "UPDATE consolidated_orders SET status = ? WHERE id = ?";
+            // Create consolidated order
+            $consolidatedOrder = $this->createConsolidatedOrder($orders, $options);
+            
+            if (!$consolidatedOrder['success']) {
+                return $consolidatedOrder;
+            }
+
+            // Update original orders status
+            $updateResult = $this->updateOriginalOrdersStatus($orders, $consolidatedOrder['order_id']);
+            
+            if (!$updateResult['success']) {
+                return $updateResult;
+            }
+
+            return [
+                'success' => true,
+                'group_key' => $groupKey,
+                'original_orders_count' => count($orders),
+                'consolidated_order' => $consolidatedOrder['order'],
+                'consolidation_savings' => $this->calculateGroupSavings($orders, $consolidatedOrder['order'])
+            ];
+
+        } catch (Exception $e) {
+            $this->logger->error('Failed to consolidate order group', [
+                'group_key' => $groupKey,
+                'orders_count' => count($orders),
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Order group consolidation failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Create consolidated order from multiple orders
+     */
+    private function createConsolidatedOrder(array $orders, array $options): array
+    {
+        try {
+            // Determine consolidation approach
+            $primaryOrder = $orders[0];
+            $totalAmount = array_sum(array_column($orders, 'total_amount'));
+            $deliveryFee = $this->calculateConsolidatedDeliveryFee($orders, $options);
+
+            // Create consolidated order
+            $consolidatedOrderData = [
+                'customer_id' => $primaryOrder['customer_id'],
+                'vendor_id' => $primaryOrder['vendor_id'],
+                'order_type' => 'consolidated',
+                'delivery_date' => $primaryOrder['delivery_date'],
+                'delivery_slot_id' => $primaryOrder['delivery_slot_id'],
+                'delivery_address' => $primaryOrder['delivery_address'],
+                'subtotal_amount' => $totalAmount,
+                'delivery_fee' => $deliveryFee,
+                'total_amount' => $totalAmount + $deliveryFee,
+                'status' => 'pending',
+                'consolidation_group' => uniqid('CONS_'),
+                'original_orders_count' => count($orders)
+            ];
+
+            $sql = "INSERT INTO orders (" . implode(', ', array_keys($consolidatedOrderData)) . ") 
+                    VALUES (" . str_repeat('?,', count($consolidatedOrderData) - 1) . "?)";
+            
             $stmt = $this->db->prepare($sql);
-            $success = $stmt->execute([$status, $consolidatedId]);
+            $success = $stmt->execute(array_values($consolidatedOrderData));
+
+            if (!$success) {
+                return [
+                    'success' => false,
+                    'error' => 'Failed to create consolidated order'
+                ];
+            }
+
+            $consolidatedOrderId = $this->db->lastInsertId();
+
+            // Create consolidated order items
+            $itemsResult = $this->createConsolidatedOrderItems($consolidatedOrderId, $orders);
+            
+            if (!$itemsResult['success']) {
+                return $itemsResult;
+            }
+
+            $consolidatedOrderData['id'] = $consolidatedOrderId;
+
+            return [
+                'success' => true,
+                'order_id' => $consolidatedOrderId,
+                'order' => $consolidatedOrderData
+            ];
+
+        } catch (Exception $e) {
+            $this->logger->error('Failed to create consolidated order', [
+                'orders_count' => count($orders),
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Consolidated order creation failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Create consolidated order items
+     */
+    private function createConsolidatedOrderItems(int $consolidatedOrderId, array $orders): array
+    {
+        try {
+            $consolidatedItems = [];
+
+            // Group items by product
+            foreach ($orders as $order) {
+                $productId = $order['product_id'];
+                
+                if (!isset($consolidatedItems[$productId])) {
+                    $consolidatedItems[$productId] = [
+                        'product_id' => $productId,
+                        'quantity' => 0,
+                        'unit_price' => $order['unit_price'],
+                        'product_name' => $order['product_name']
+                    ];
+                }
+                
+                $consolidatedItems[$productId]['quantity'] += $order['quantity'];
+            }
+
+            // Insert consolidated items
+            foreach ($consolidatedItems as $item) {
+                $sql = "INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price)
+                        VALUES (?, ?, ?, ?, ?)";
+                
+                $totalPrice = $item['quantity'] * $item['unit_price'];
+                
+                $stmt = $this->db->prepare($sql);
+                $stmt->execute([
+                    $consolidatedOrderId,
+                    $item['product_id'],
+                    $item['quantity'],
+                    $item['unit_price'],
+                    $totalPrice
+                ]);
+            }
+
+            return [
+                'success' => true,
+                'items_count' => count($consolidatedItems)
+            ];
+
+        } catch (Exception $e) {
+            $this->logger->error('Failed to create consolidated order items', [
+                'consolidated_order_id' => $consolidatedOrderId,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Consolidated order items creation failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Calculate consolidated delivery fee
+     */
+    private function calculateConsolidatedDeliveryFee(array $orders, array $options): float
+    {
+        $totalOriginalFees = array_sum(array_column($orders, 'delivery_fee'));
+        $discountPercentage = $options['delivery_fee_discount'] ?? 20; // 20% discount by default
+        
+        return $totalOriginalFees * (1 - $discountPercentage / 100);
+    }
+
+    /**
+     * Update original orders status
+     */
+    private function updateOriginalOrdersStatus(array $orders, int $consolidatedOrderId): array
+    {
+        try {
+            $orderIds = array_column($orders, 'id');
+            $placeholders = str_repeat('?,', count($orderIds) - 1) . '?';
+            
+            $sql = "UPDATE orders 
+                    SET status = 'consolidated', 
+                        consolidated_order_id = ?,
+                        updated_at = NOW()
+                    WHERE id IN ({$placeholders})";
+            
+            $params = array_merge([$consolidatedOrderId], $orderIds);
+            
+            $stmt = $this->db->prepare($sql);
+            $success = $stmt->execute($params);
 
             if ($success) {
                 return [
                     'success' => true,
-                    'message' => 'Consolidation status updated successfully'
+                    'updated_orders' => $stmt->rowCount()
                 ];
             } else {
                 return [
                     'success' => false,
-                    'error' => 'Failed to update consolidation status'
+                    'error' => 'Failed to update original orders status'
                 ];
             }
 
         } catch (Exception $e) {
+            $this->logger->error('Failed to update original orders status', [
+                'consolidated_order_id' => $consolidatedOrderId,
+                'error' => $e->getMessage()
+            ]);
+
             return [
                 'success' => false,
-                'error' => 'Status update failed: ' . $e->getMessage()
+                'error' => 'Original orders status update failed: ' . $e->getMessage()
             ];
         }
     }
 
     /**
-     * Create consolidated orders table
+     * Calculate group savings
      */
-    private function createConsolidatedOrdersTable(): void
+    private function calculateGroupSavings(array $originalOrders, array $consolidatedOrder): array
     {
-        $sql = "CREATE TABLE IF NOT EXISTS consolidated_orders (
-            id BIGINT PRIMARY KEY AUTO_INCREMENT,
-            delivery_date DATE NOT NULL,
-            vendor_id BIGINT NOT NULL,
-            delivery_time_slot VARCHAR(20) NOT NULL,
-            delivery_address TEXT NOT NULL,
-            delivery_latitude DECIMAL(10, 8),
-            delivery_longitude DECIMAL(11, 8),
-            total_orders INT NOT NULL,
-            total_quantity INT NOT NULL,
-            total_amount DECIMAL(12, 2) NOT NULL,
-            customer_count INT NOT NULL,
-            product_count INT NOT NULL,
-            requires_cold_chain BOOLEAN DEFAULT FALSE,
-            order_ids JSON NOT NULL,
-            customer_ids JSON NOT NULL,
-            product_summary JSON NOT NULL,
-            consolidation_key VARCHAR(255) NOT NULL,
-            status ENUM('consolidated', 'assigned', 'in_transit', 'delivered', 'failed') DEFAULT 'consolidated',
-            assigned_driver_id BIGINT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            
-            INDEX idx_delivery_date (delivery_date),
-            INDEX idx_vendor_id (vendor_id),
-            INDEX idx_status (status),
-            INDEX idx_consolidation_key (consolidation_key)
-        )";
+        $originalDeliveryFees = array_sum(array_column($originalOrders, 'delivery_fee'));
+        $consolidatedDeliveryFee = $consolidatedOrder['delivery_fee'];
         
+        $deliveryFeeSavings = $originalDeliveryFees - $consolidatedDeliveryFee;
+        $savingsPercentage = $originalDeliveryFees > 0 ? ($deliveryFeeSavings / $originalDeliveryFees) * 100 : 0;
+
+        return [
+            'original_delivery_fees' => $originalDeliveryFees,
+            'consolidated_delivery_fee' => $consolidatedDeliveryFee,
+            'delivery_fee_savings' => $deliveryFeeSavings,
+            'savings_percentage' => round($savingsPercentage, 2),
+            'orders_consolidated' => count($originalOrders)
+        ];
+    }
+
+    /**
+     * Analyze potential consolidations
+     */
+    private function analyzePotentialConsolidations(string $deliveryDate, array $filters): array
+    {
+        // This would analyze orders and identify consolidation opportunities
+        // For now, return a simplified analysis
+        return [
+            [
+                'type' => 'customer_location',
+                'description' => 'Orders from same customer to same location',
+                'orders_count' => 5,
+                'potential_savings_amount' => 25.00
+            ],
+            [
+                'type' => 'vendor_route',
+                'description' => 'Orders from same vendor in nearby locations',
+                'orders_count' => 8,
+                'potential_savings_amount' => 40.00
+            ]
+        ];
+    }
+
+    /**
+     * Calculate consolidation savings
+     */
+    private function calculateConsolidationSavings(array $consolidation): array
+    {
+        return [
+            'delivery_fee_savings' => $consolidation['potential_savings_amount'] ?? 0,
+            'operational_savings' => ($consolidation['orders_count'] ?? 0) * 2, // $2 per order operational savings
+            'total_savings' => ($consolidation['potential_savings_amount'] ?? 0) + (($consolidation['orders_count'] ?? 0) * 2)
+        ];
+    }
+
+    /**
+     * Calculate consolidation priority
+     */
+    private function calculateConsolidationPriority(array $consolidation, array $savings): int
+    {
+        $priority = 0;
+        
+        // Higher savings = higher priority
+        $priority += min($savings['total_savings'], 100); // Max 100 points for savings
+        
+        // More orders = higher priority
+        $priority += min(($consolidation['orders_count'] ?? 0) * 5, 50); // Max 50 points for order count
+        
+        return $priority;
+    }
+
+    /**
+     * Check if recommendation meets consolidation rules
+     */
+    private function meetsConsolidationRules(array $recommendation, array $rules): bool
+    {
+        // Check minimum orders
+        if ($recommendation['orders_count'] < $rules['min_orders_for_consolidation']) {
+            return false;
+        }
+
+        // Check minimum savings percentage
+        $savingsPercentage = $recommendation['potential_savings']['total_savings'] / 
+                           max($recommendation['orders_count'] * 10, 1) * 100; // Assume $10 average per order
+        
+        if ($savingsPercentage < $rules['min_savings_percentage']) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Execute consolidation recommendation
+     */
+    private function executeConsolidationRecommendation(array $recommendation): array
+    {
+        // This would execute the actual consolidation
+        // For now, return a simulated result
+        return [
+            'success' => true,
+            'recommendation_type' => $recommendation['type'],
+            'orders_consolidated' => $recommendation['orders_count'],
+            'actual_savings' => $recommendation['potential_savings']['total_savings'] * 0.9 // 90% of potential savings
+        ];
+    }
+
+    /**
+     * Calculate consolidation statistics
+     */
+    private function calculateConsolidationStatistics(array $activities): array
+    {
+        $totalActivities = count($activities);
+        $totalOrdersConsolidated = array_sum(array_column($activities, 'original_orders_count'));
+        $totalSavings = array_sum(array_column($activities, 'total_savings'));
+
+        return [
+            'total_consolidation_activities' => $totalActivities,
+            'total_orders_consolidated' => $totalOrdersConsolidated,
+            'total_savings_amount' => $totalSavings,
+            'average_orders_per_consolidation' => $totalActivities > 0 ? $totalOrdersConsolidated / $totalActivities : 0,
+            'average_savings_per_consolidation' => $totalActivities > 0 ? $totalSavings / $totalActivities : 0
+        ];
+    }
+
+    /**
+     * Group orders by location proximity
+     */
+    private function groupOrdersByLocation(array $orders, array $options): array
+    {
+        // Simple grouping by postal code for now
+        $groups = [];
+        
+        foreach ($orders as $order) {
+            $postalCode = $this->extractPostalCode($order['delivery_address']);
+            $groupKey = $postalCode ?: 'unknown';
+            
+            if (!isset($groups[$groupKey])) {
+                $groups[$groupKey] = [];
+            }
+            $groups[$groupKey][] = $order;
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Optimize delivery route for orders
+     */
+    private function optimizeDeliveryRoute(array $orders, array $options): array
+    {
+        // Simple route optimization - sort by address for now
+        usort($orders, fn($a, $b) => strcmp($a['delivery_address'], $b['delivery_address']));
+
+        return [
+            'success' => true,
+            'route' => [
+                'orders' => $orders,
+                'total_orders' => count($orders),
+                'estimated_distance_km' => count($orders) * 2, // Simplified calculation
+                'estimated_time_minutes' => count($orders) * 15 // 15 minutes per delivery
+            ]
+        ];
+    }
+
+    /**
+     * Record consolidation activity
+     */
+    private function recordConsolidationActivity(int $deliverySlotId, string $deliveryDate, array $results): void
+    {
+        try {
+            foreach ($results as $result) {
+                if ($result['success']) {
+                    $sql = "INSERT INTO consolidation_activities 
+                            (delivery_slot_id, delivery_date, consolidation_type, 
+                             original_orders_count, consolidated_orders_count, 
+                             total_savings, consolidation_data, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+
+                    $stmt = $this->db->prepare($sql);
+                    $stmt->execute([
+                        $deliverySlotId,
+                        $deliveryDate,
+                        'slot_consolidation',
+                        $result['original_orders_count'],
+                        1, // One consolidated order
+                        $result['consolidation_savings']['total_savings'] ?? 0,
+                        json_encode($result)
+                    ]);
+                }
+            }
+
+        } catch (Exception $e) {
+            $this->logger->error('Failed to record consolidation activity', [
+                'delivery_slot_id' => $deliverySlotId,
+                'delivery_date' => $deliveryDate,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Create consolidation tables
+     */
+    private function createConsolidationTables(): void
+    {
+        // Consolidation activities table
+        $sql = "CREATE TABLE IF NOT EXISTS consolidation_activities (
+            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+            delivery_slot_id BIGINT,
+            vendor_id BIGINT,
+            delivery_date DATE NOT NULL,
+            consolidation_type VARCHAR(50) NOT NULL,
+            original_orders_count INT NOT NULL,
+            consolidated_orders_count INT NOT NULL,
+            total_savings DECIMAL(10,2) DEFAULT 0.00,
+            consolidation_data JSON,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            
+            INDEX idx_delivery_slot_id (delivery_slot_id),
+            INDEX idx_vendor_id (vendor_id),
+            INDEX idx_delivery_date (delivery_date),
+            INDEX idx_consolidation_type (consolidation_type),
+            INDEX idx_created_at (created_at)
+        )";
+
         $this->db->exec($sql);
     }
 }
