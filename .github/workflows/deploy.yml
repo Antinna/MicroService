@@ -14,6 +14,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,30 +38,35 @@ jobs:
           pids=()
           services=()
 
-          for dir in */ ; do
-            if [[ "$dir" != .* && -f "$dir/wasmer.toml" ]]; then
-              echo "🚀 Starting deploy for $dir..."
+          for dir in */; do
+            clean_dir="${dir%/}"  # remove trailing slash
+            wasmer_toml="${clean_dir}/wasmer.toml"
+
+            if [[ -f "$wasmer_toml" ]]; then
+              echo "🚀 Starting deploy for $clean_dir..."
+
               (
-                # If app/composer.json exists, install PHP deps
-                if [[ -f "${dir}app/composer.json" ]]; then
-                  echo "📦 Installing PHP dependencies in $dir/app..."
-                  cd "${dir}app"
+                # Check and install PHP dependencies
+                if [[ -f "${clean_dir}/app/composer.json" ]]; then
+                  echo "📦 Installing PHP dependencies in ${clean_dir}/app..."
+                  cd "${clean_dir}/app" || { echo "❌ [${clean_dir}] app folder missing"; exit 1; }
                   composer install --prefer-dist
                   composer dump-autoload --optimize
                   cd ../
                 fi
 
-                # Run Wasmer deploy in the microservice root
-                cd "$dir"
-                echo "⚙️ Running wasmer deploy in $dir..."
+                # Deploy with Wasmer
+                cd "$clean_dir" || { echo "❌ [${clean_dir}] folder missing"; exit 1; }
+                echo "⚙️ Running wasmer deploy in $clean_dir..."
                 wasmer deploy --token=${{ secrets.WASMER_TOKEN }} --non-interactive --no-wait --no-persist-id
               ) &
+              
               pids+=($!)
-              services+=("$dir")
+              services+=("$clean_dir")
             fi
           done
 
-          # Wait for all deploys and check success/failure
+          # Wait for each deploy
           exit_code=0
           for i in "${!pids[@]}"; do
             pid="${pids[$i]}"
