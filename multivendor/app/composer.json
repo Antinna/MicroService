@@ -1,11 +1,11 @@
 {
     "name": "antinna/multivendor",
-    "description": "All Online Pay workflows here",
+    "description": "Multivendor service for dairy and vegetable delivery platform",
     "type": "project",
     "require": {
       "php": "8.1.*||8.2.*||8.3.*||8.4.*",
       "ext-pdo": "*",
-        "vlucas/phpdotenv": "^5.6"
+      "vlucas/phpdotenv": "^5.6.2"
     },
 
   "minimum-stability": "stable",

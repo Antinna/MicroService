@@ -17,12 +17,19 @@ graph TB
     A --> F[Analytics & Dashboard Module]
     A --> G[Notification Module]
     A --> H[Compliance Module]
+    A --> I[Admin Panel Module]
     
-    A --> I[(MySQL Database)]
-    A --> J[Payment Service API]
-    A --> K[Firebase Notifications]
-    A --> L[SMS/Email Service]
-    A --> M[Delivery Service API]
+    A --> J[(MySQL Database)]
+    A --> K[Payment Service API]
+    A --> L[Firebase Notifications]
+    A --> M[SMS/Email Service]
+    A --> N[Delivery Service API]
+    
+    I --> O[Auth Service Migration API]
+    I --> P[Pay Service Migration API]
+    I --> Q[Social Service Migration API]
+    I --> R[Delivery Service Migration API]
+    I --> S[Multivendor Service Migration API]
 ```
 
 ### Service Integration Points
@@ -146,6 +153,33 @@ graph TB
 - `traceability_logs`: Complete product journey tracking
 - `safety_incidents`: Food safety incident records
 - `audit_trails`: Compliance audit history
+
+### 8. Admin Panel Module
+
+**Purpose**: Provide centralized administration interface for managing database migrations and system setup across all microservices.
+
+**Key Classes**:
+- `AdminAuthenticator`: Handles admin login with environment variable credentials
+- `MigrationOrchestrator`: Coordinates migrations across all microservices
+- `ServiceHealthChecker`: Monitors microservice availability and database connectivity
+- `MigrationHistoryTracker`: Tracks migration status and execution history
+
+**Key Features**:
+- **Authentication**: Uses `ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables (defaults to "admin"/"admin")
+- **Multi-Service Migration**: Executes migrations for auth, pay, social, delivery, and multivendor services
+- **Real-time Progress**: WebSocket-based progress updates during migration execution
+- **Rollback Support**: Ability to rollback failed migrations with detailed error reporting
+- **One-Click Setup**: Initial system setup with all required schemas and seed data
+
+**Database Tables**:
+- `migration_history`: Track migration execution across all services
+- `admin_sessions`: Admin authentication session management
+- `service_health`: Monitor microservice availability and status
+
+**Integration Points**:
+- HTTP APIs to each microservice's migration endpoints
+- WebSocket connections for real-time progress updates
+- Service discovery for dynamic microservice endpoint resolution
 
 ## Data Models
 

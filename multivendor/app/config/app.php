@@ -1,32 +1,75 @@
 <?php
 
-use function Antinna\MultiVendor\env;
+namespace Antinna\MultiVendor\Config;
 
-return [
+/**
+ * Application configuration class
+ */
+class App
+{
+    private static ?App $instance = null;
+    private array $config;
 
-    'name' => env('APP_NAME', 'Antinna'),
+    private function __construct()
+    {
+        $this->config = [
+            'name' => 'Multivendor Service',
+            'version' => '1.0.0',
+            'environment' => $_ENV['APP_ENV'] ?? 'production',
+            'debug' => filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'timezone' => $_ENV['APP_TIMEZONE'] ?? 'UTC',
+            
+            // Admin panel configuration
+            'admin' => [
+                'username' => $_ENV['ADMIN_USERNAME'] ?? 'admin',
+                'password' => $_ENV['ADMIN_PASSWORD'] ?? 'admin',
+            ],
+            
+            // External service URLs
+            'services' => [
+                'auth' => $_ENV['AUTH_SERVICE_URL'] ?? 'http://localhost:8001',
+                'pay' => $_ENV['PAY_SERVICE_URL'] ?? 'http://localhost:8002',
+                'social' => $_ENV['SOCIAL_SERVICE_URL'] ?? 'http://localhost:8003',
+                'delivery' => $_ENV['DELIVERY_SERVICE_URL'] ?? 'http://localhost:8004',
+            ],
+            
+            // Notification settings
+            'notifications' => [
+                'firebase_key' => $_ENV['FIREBASE_SERVER_KEY'] ?? '',
+                'sms_api_key' => $_ENV['SMS_API_KEY'] ?? '',
+                'email_smtp_host' => $_ENV['EMAIL_SMTP_HOST'] ?? '',
+                'email_smtp_port' => $_ENV['EMAIL_SMTP_PORT'] ?? 587,
+                'email_username' => $_ENV['EMAIL_USERNAME'] ?? '',
+                'email_password' => $_ENV['EMAIL_PASSWORD'] ?? '',
+            ]
+        ];
+    }
 
-    'env' => env('APP_ENV', 'production'),
+    public static function getInstance(): App
+    {
+        if (self::$instance === null) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
 
-    'debug' => (bool) env('APP_DEBUG', false),
+    public function get(string $key, $default = null)
+    {
+        $keys = explode('.', $key);
+        $value = $this->config;
+        
+        foreach ($keys as $k) {
+            if (!isset($value[$k])) {
+                return $default;
+            }
+            $value = $value[$k];
+        }
+        
+        return $value;
+    }
 
-    'url' => env('APP_URL', 'http://localhost'),
-
-    'timezone' => env('APP_TIMEZONE', 'UTC'),
-
-    'locale' => env('APP_LOCALE', 'en'),
-    'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
-    'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
-
-    'cipher' => 'AES-256-CBC',
-    'key' => env('APP_KEY'),
-
-    'previous_keys' => array_filter(
-        explode(',', env('APP_PREVIOUS_KEYS', ''))
-    ),
-
-    'maintenance' => [
-        'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
-        'store' => env('APP_MAINTENANCE_STORE', 'database'),
-    ],
-];
+    public function getAll(): array
+    {
+        return $this->config;
+    }
+}
