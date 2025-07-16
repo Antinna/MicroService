@@ -1,44 +1,47 @@
 # Project Structure
 
-## Root Level Organization
-The project follows a microservices architecture with each service in its own directory:
+## Repository Organization
+This is a monorepo containing multiple microservices, each following a consistent structure pattern.
 
+## Root Level
 ```
-├── auth/           # Authentication service
-├── delivery/       # Delivery management service  
-├── multivendor/    # Multi-vendor marketplace service
-├── pay/            # Payment processing service
-└── .kiro/          # Kiro IDE configuration
-```
-
-## Service Structure Pattern
-Each service follows the same standardized structure:
-
-```
-service-name/
-├── app/                    # PHP application code
-│   ├── bootstrap/          # Application bootstrapping
-│   ├── config/             # Service-specific configuration
-│   ├── Helpers/            # Utility classes and helpers
-│   ├── composer.json       # PHP dependencies
-│   └── info.php           # Service information
-├── config/                 # Runtime configuration files
-├── app.yaml               # Wasmer deployment configuration
-├── wasmer.toml            # Wasmer runtime settings
-└── README.md              # Service documentation
+├── .github/workflows/     # CI/CD deployment workflows
+├── .kiro/                # Kiro IDE configuration and steering
+├── auth/                 # Authentication microservice
+├── delivery/             # Delivery management microservice
+├── multivendor/          # Vendor management microservice
+├── pay/                  # Payment processing microservice
+├── social/               # Social features microservice
+└── ReadMe.md            # Main project documentation
 ```
 
-## Conventions
-- Each service is completely independent and self-contained
-- All services use identical deployment configuration patterns
-- Configuration is externalized through environment variables
-- Services communicate via APIs (no shared databases or files)
-- Each service has its own dependency management via composer.json
+## Microservice Structure
+Each microservice follows this standardized pattern:
+```
+[service-name]/
+├── app/                  # Application code
+│   ├── bootstrap/        # Application bootstrapping
+│   ├── config/          # Service-specific configuration
+│   ├── Helpers/         # Utility functions and helpers
+│   └── composer.json    # PHP dependencies and autoloading
+├── config/              # Runtime configuration (php.ini, etc.)
+├── app.yaml            # Wasmer deployment configuration
+├── wasmer.toml         # Wasmer project configuration
+└── README.md           # Service-specific documentation
+```
 
-## Adding New Services
-When creating a new service:
-1. Create directory following the naming convention (lowercase, descriptive)
-2. Copy the standard structure from an existing service
-3. Update `app.yaml` with unique `name` and `app_id`
-4. Customize the `/app` directory with service-specific PHP code
-5. Update the service README.md with purpose and API documentation
+## Naming Conventions
+- **Services**: Lowercase directory names (auth, pay, social, delivery, multivendor)
+- **Namespaces**: PascalCase with vendor prefix (`Antinna\Auth\`, `Antinna\Pay\`)
+- **Autoloading**: PSR-4 standard with service root as namespace root
+
+## Configuration Management
+- **Environment**: Managed via app.yaml with standardized variable names
+- **Service Config**: Each service has its own config/ directory
+- **Shared Standards**: All services use identical database connection variables
+
+## Development Guidelines
+- Each microservice is independently deployable
+- Shared configurations should be documented in main README
+- New services should follow the established directory structure
+- All services must include wasmer.toml and app.yaml for deployment

@@ -1,38 +1,53 @@
 # Technology Stack
 
-## Runtime & Deployment
-- **Wasmer**: Edge computing platform for deployment
-- **WASI**: WebAssembly System Interface for cross-platform execution
-- **PHP 8.3.401**: Primary programming language
+## Core Technologies
+- **Language**: PHP 8.1+ (supports 8.1, 8.2, 8.3, 8.4)
+- **Database**: MySQL with PDO extension
+- **Deployment**: Wasmer.io platform
+- **CI/CD**: GitHub Actions with parallel deployment
 
-## Database
-- **MySQL**: Primary database engine with environment-based configuration
+## Dependencies
+- **vlucas/phpdotenv**: Environment configuration management
+- **Composer**: PHP dependency management with PSR-4 autoloading
 
-## Configuration Files
-- `wasmer.toml`: Wasmer runtime configuration and dependencies
-- `app.yaml`: Application deployment configuration with environment variables
-- `composer.json`: PHP dependency management
+## Infrastructure
+- **Platform**: Wasmer.io with single concurrency scaling
+- **Notifications**: Firebase (shared across all microservices)
+- **Communication**: SMS and Email integration
+
+## Environment Configuration
+All services use standardized environment variables:
+- `DB_HOST`, `DB_PORT`, `DB_NAME`: Database connection
+- `DB_USERNAME`, `DB_PASSWORD`: Database credentials
+
+When adding new environment variables, always:
+1. Document the variable purpose and which microservice uses it
+2. Update the relevant README file
+3. Add to the service's app.yaml configuration
 
 ## Common Commands
 
 ### Development
 ```bash
-# Run a service locally (from service directory)
-wasmer run
-
 # Install PHP dependencies
-composer install
+cd [service]/app
+composer install --prefer-dist
+composer dump-autoload --optimize
 ```
 
-### Service Management
-Each service runs on localhost:8080 when started locally. Services are configured to:
-- Mount `/app` directory for application code
-- Mount `/config` directory for configuration files
-- Use single concurrency scaling mode
+### Deployment
+```bash
+# Deploy single service
+cd [service]
+wasmer deploy --token=$TOKEN --non-interactive --no-wait --no-persist-id
 
-## Environment Variables
-Services use environment-based configuration for:
-- `DB_HOST`, `DB_PORT`, `DB_NAME`: Database connection
-- `DB_USERNAME`, `DB_PASSWORD`: Database credentials
+# Deploy all services (handled by GitHub Actions)
+git push origin [branch]
+```
 
-All services follow the same deployment pattern with Wasmer.io App.v0 specification.
+### Project Setup
+```bash
+# Each service follows the same structure
+# Ensure wasmer.toml exists in service root
+# Ensure composer.json exists in service/app/
+```

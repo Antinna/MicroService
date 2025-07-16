@@ -1,12 +1,21 @@
 # Product Overview
 
-This is a microservices-based e-commerce platform with the following core services:
+This is a microservices-based platform for dairy and vegetable delivery with subscription models. The system handles vendor onboarding, product management, payments, authentication, social features, and delivery logistics.
 
-- **Auth**: Authentication and user management system
-- **Pay**: Payment processing service  
-- **Delivery**: Order fulfillment and shipping management
-- **Multivendor**: Multi-vendor marketplace functionality
+## Core Services
+- **Auth**: Multi-method authentication (passkeys, magic links, social logins, MFA)
+- **Pay**: Payment processing, refunds, and vendor payouts
+- **Social**: Chat and video calling functionality
+- **Delivery**: Logistics and delivery management with cold-chain support
+- **Multivendor**: Vendor onboarding, product management, and subscription handling
 
-Each service is designed as an independent, deployable unit that can be scaled individually. The platform follows a distributed architecture pattern where services communicate through well-defined APIs.
+## Key Business Features
+- Doorstep delivery of dairy products and vegetables
+- Subscription-based and on-demand ordering
+- Vendor management with KYC and business type classification
+- Food safety compliance with FSSAI licensing and batch tracking
+- Smart features like auto-expiry removal and predictive stock alerts
+- Firebase notifications and SMS/email communication
 
-The system is built for cloud deployment using Wasmer's edge computing platform, enabling global distribution and low-latency responses.
+## Target Market
+Fresh produce delivery platform focusing on perishables with emphasis on freshness, traceability, and vendor ecosystem management.

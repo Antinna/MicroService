@@ -1,0 +1,76 @@
+name: Deploy All Microservices in Parallel to Wasmer
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ '*' ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Wasmer
+        uses: wasmerio/setup-wasmer@v3.1
+
+      - name: Install PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, intl
+          tools: composer
+
+      - name: Deploy all microservices in parallel
+        shell: bash
+        run: |
+          set -e
+          echo "🔍 Discovering microservices..."
+
+          pids=()
+          services=()
+
+          for dir in */ ; do
+            if [[ "$dir" != .* && -f "$dir/wasmer.toml" ]]; then
+              echo "🚀 Starting deploy for $dir..."
+              (
+                # If app/composer.json exists, install PHP deps
+                if [[ -f "${dir}app/composer.json" ]]; then
+                  echo "📦 Installing PHP dependencies in $dir/app..."
+                  cd "${dir}app"
+                  composer install --prefer-dist
+                  composer dump-autoload --optimize
+                  cd ../
+                fi
+
+                # Run Wasmer deploy in the microservice root
+                cd "$dir"
+                echo "⚙️ Running wasmer deploy in $dir..."
+                wasmer deploy --token=${{ secrets.WASMER_TOKEN }} --non-interactive --no-wait --no-persist-id
+              ) &
+              pids+=($!)
+              services+=("$dir")
+            fi
+          done
+
+          # Wait for all deploys and check success/failure
+          exit_code=0
+          for i in "${!pids[@]}"; do
+            pid="${pids[$i]}"
+            svc="${services[$i]}"
+            if wait "$pid"; then
+              echo "✅ [$svc] deployed successfully."
+            else
+              echo "❌ [$svc] deployment failed."
+              exit_code=1
+            fi
+          done
+
+          exit $exit_code
