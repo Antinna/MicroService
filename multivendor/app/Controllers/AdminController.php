@@ -716,29 +716,25 @@ class AdminController
             const services = healthData.services;
             const summary = healthData.summary;
             
-            let html = `
-                <div style="margin-bottom: 15px;">
-                    <strong>Overall Status:</strong> 
-                    <span class="status-badge ${summary.overall_status === 'healthy' ? 'status-completed' : 'status-failed'}">
-                        ${summary.overall_status.toUpperCase()}
-                    </span>
-                    <br><small>${summary.healthy_services}/${summary.total_services} services healthy</small>
-                </div>
-                <div class="status-grid">
-            `;
+            let html = "<div style=\"margin-bottom: 15px;\">" +
+                "<strong>Overall Status:</strong> " +
+                "<span class=\"status-badge " + (summary.overall_status === "healthy" ? "status-completed" : "status-failed") + "\">" +
+                summary.overall_status.toUpperCase() +
+                "</span>" +
+                "<br><small>" + summary.healthy_services + "/" + summary.total_services + " services healthy</small>" +
+                "</div>" +
+                "<div class=\"status-grid\">";
             
             for (const [serviceKey, service] of Object.entries(services)) {
-                const statusClass = service.status === 'healthy' ? 'status-healthy' : 'status-unhealthy';
-                html += `
-                    <div class="status-item ${statusClass}">
-                        <strong>${service.name}</strong><br>
-                        <small>${service.status}</small>
-                        ${service.response_time ? `<br><small>${service.response_time}ms</small>` : ''}
-                    </div>
-                `;
+                const statusClass = service.status === "healthy" ? "status-healthy" : "status-unhealthy";
+                html += "<div class=\"status-item " + statusClass + "\">" +
+                    "<strong>" + service.name + "</strong><br>" +
+                    "<small>" + service.status + "</small>" +
+                    (service.response_time ? "<br><small>" + service.response_time + "ms</small>" : "") +
+                    "</div>";
             }
             
-            html += '</div>';
+            html += "</div>";
             healthDiv.innerHTML = html;
         }
 

@@ -22,7 +22,7 @@ class FSSAIValidatorTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('valid', $result);
-        
+
         // Should be valid due to mock external API
         if ($result['valid']) {
             $this->assertArrayHasKey('message', $result);
@@ -75,7 +75,7 @@ class FSSAIValidatorTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('success', $result);
-        
+
         if ($result['success']) {
             $this->assertArrayHasKey('record_id', $result);
             $this->assertArrayHasKey('status', $result);
@@ -100,7 +100,7 @@ class FSSAIValidatorTest extends TestCase
         $this->assertArrayHasKey('success', $result);
         $this->assertFalse($result['success']);
         $this->assertArrayHasKey('errors', $result);
-        
+
         $errors = $result['errors'];
         $this->assertArrayHasKey('compliance_type', $errors);
         $this->assertArrayHasKey('certificate_number', $errors);
@@ -115,7 +115,7 @@ class FSSAIValidatorTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('success', $result);
-        
+
         if ($result['success']) {
             $this->assertArrayHasKey('vendor_id', $result);
             $this->assertArrayHasKey('compliance_status', $result);
@@ -124,14 +124,14 @@ class FSSAIValidatorTest extends TestCase
             $this->assertArrayHasKey('valid_records', $result);
             $this->assertArrayHasKey('expiring_records', $result);
             $this->assertArrayHasKey('expired_records', $result);
-            
+
             $this->assertEquals($vendorId, $result['vendor_id']);
             $this->assertIsBool($result['has_valid_fssai']);
             $this->assertIsInt($result['total_records']);
             $this->assertIsArray($result['valid_records']);
             $this->assertIsArray($result['expiring_records']);
             $this->assertIsArray($result['expired_records']);
-            
+
             $this->assertContains($result['compliance_status'], ['compliant', 'warning', 'non_compliant']);
         }
     }
@@ -143,12 +143,12 @@ class FSSAIValidatorTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('success', $result);
-        
+
         if ($result['success']) {
             $this->assertArrayHasKey('days_threshold', $result);
             $this->assertArrayHasKey('expiring_count', $result);
             $this->assertArrayHasKey('records', $result);
-            
+
             $this->assertEquals($daysThreshold, $result['days_threshold']);
             $this->assertIsInt($result['expiring_count']);
             $this->assertIsArray($result['records']);
@@ -158,10 +158,10 @@ class FSSAIValidatorTest extends TestCase
         $thresholds = [7, 15, 60, 90];
         foreach ($thresholds as $threshold) {
             $result = $this->fssaiValidator->getExpiringComplianceRecords($threshold);
-            
+
             $this->assertIsArray($result);
             $this->assertArrayHasKey('success', $result);
-            
+
             if ($result['success']) {
                 $this->assertEquals($threshold, $result['days_threshold']);
             }
@@ -175,15 +175,15 @@ class FSSAIValidatorTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('success', $result);
-        
+
         if ($result['success']) {
             $this->assertArrayHasKey('generated_at', $result);
             $this->assertArrayHasKey('statistics', $result);
             $this->assertArrayHasKey('vendor_report', $result);
-            
+
             $this->assertIsArray($result['statistics']);
             $this->assertIsArray($result['vendor_report']);
-            
+
             // Check statistics structure
             $stats = $result['statistics'];
             $this->assertArrayHasKey('total_vendors', $stats);
@@ -191,7 +191,7 @@ class FSSAIValidatorTest extends TestCase
             $this->assertArrayHasKey('warning_vendors', $stats);
             $this->assertArrayHasKey('non_compliant_vendors', $stats);
             $this->assertArrayHasKey('compliance_rate', $stats);
-            
+
             $this->assertIsInt($stats['total_vendors']);
             $this->assertIsInt($stats['compliant_vendors']);
             $this->assertIsInt($stats['warning_vendors']);
@@ -225,7 +225,7 @@ class FSSAIValidatorTest extends TestCase
 
             $this->assertIsArray($result);
             $this->assertArrayHasKey('success', $result);
-            
+
             // Should succeed for all valid compliance types
             if (!$result['success'] && isset($result['errors'])) {
                 $this->assertArrayNotHasKey('compliance_type', $result['errors']);
@@ -236,7 +236,7 @@ class FSSAIValidatorTest extends TestCase
     public function testDateValidation()
     {
         $vendorId = 1;
-        
+
         // Test with future issue date
         $futureIssueData = [
             'compliance_type' => 'fssai',
@@ -279,16 +279,16 @@ class FSSAIValidatorTest extends TestCase
             '1234567890',     // 10-digit with valid state code
             '12345678901234', // 14-digit with valid state code
             '2134567890',     // Different valid state code
-            '3734567890123456'[0..13] // 14-digit with different state code
+            '37345678901234'  // 14-digit with different state code
         ];
 
         foreach ($validLicenses as $license) {
             if (strlen($license) === 10 || strlen($license) === 14) {
                 $result = $this->fssaiValidator->validateLicense($license);
-                
+
                 $this->assertIsArray($result);
                 $this->assertArrayHasKey('valid', $result);
-                
+
                 // Should not fail due to format (may fail due to other reasons)
                 if (!$result['valid']) {
                     $this->assertNotEquals('Invalid FSSAI license format', $result['error']);
@@ -300,7 +300,7 @@ class FSSAIValidatorTest extends TestCase
     public function testComplianceStatusDetermination()
     {
         $vendorId = 1;
-        
+
         // Test with expired certificate
         $expiredData = [
             'compliance_type' => 'fssai',
@@ -314,7 +314,7 @@ class FSSAIValidatorTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('success', $result);
-        
+
         if ($result['success']) {
             $this->assertArrayHasKey('status', $result);
             $this->assertEquals('expired', $result['status']);
@@ -333,7 +333,7 @@ class FSSAIValidatorTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('success', $result);
-        
+
         if ($result['success']) {
             $this->assertArrayHasKey('status', $result);
             $this->assertEquals('valid', $result['status']);

@@ -123,7 +123,7 @@ class ExpiryManager
     {
         try {
             $expiringBatches = $this->batchRepository->findExpiringSoon($days);
-            
+
             // Group by vendor for easier notification processing
             $vendorGroups = [];
             foreach ($expiringBatches as $batch) {
@@ -174,7 +174,7 @@ class ExpiryManager
 
                     // Update product status based on availability
                     $newStatus = $totalAvailable > 0 ? 'active' : 'out_of_stock';
-                    
+
                     if ($product['status'] !== $newStatus) {
                         $success = $this->productRepository->update($product['id'], ['status' => $newStatus]);
                         if ($success) {
@@ -220,7 +220,7 @@ class ExpiryManager
     {
         try {
             $expiringResult = $this->getBatchesExpiringSoon($days);
-            
+
             if (!$expiringResult['success']) {
                 return $expiringResult;
             }
@@ -229,7 +229,7 @@ class ExpiryManager
             foreach ($expiringResult['vendor_groups'] as $vendorGroup) {
                 $batchCount = count($vendorGroup['batches']);
                 $totalQuantity = array_sum(array_column($vendorGroup['batches'], 'quantity_available'));
-                
+
                 $alerts[] = [
                     'vendor_name' => $vendorGroup['vendor_name'],
                     'alert_type' => 'expiry_warning',
@@ -264,14 +264,18 @@ class ExpiryManager
     {
         try {
             $cutoffDate = date('Y-m-d', strtotime("-{$daysOld} days"));
-            
+
+            // Get database connection directly
+            $db = new \Antinna\MultiVendor\Database\Connection();
+            $pdo = $db->getConnection();
+
             // Find batches that expired more than X days ago and have zero quantity
             $sql = "SELECT * FROM inventory_batches 
                     WHERE expiry_date < ? 
                     AND quantity_available = 0 
                     AND quantity_reserved = 0";
-            
-            $stmt = $this->batchRepository->db->prepare($sql);
+
+            $stmt = $pdo->prepare($sql);
             $stmt->execute([$cutoffDate]);
             $oldBatches = $stmt->fetchAll();
 

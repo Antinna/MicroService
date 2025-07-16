@@ -54,8 +54,8 @@ class VendorDashboardService
             ];
         }
     }
-}  
-  /**
+
+    /**
      * Get overview metrics
      */
     private function getOverviewMetrics(int $vendorId, string $dateFrom, string $dateTo): array
