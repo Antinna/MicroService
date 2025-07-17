@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Repositories\UserRepository;
 use Antinna\Auth\Services\AuditLogger;
 use Antinna\Auth\Database\Connection;
@@ -30,7 +30,6 @@ use Exception;
  */
 class PasskeyHandler implements PublicKeyCredentialSourceRepository
 {
-    private App $config;
     private PDO $db;
     private UserRepository $userRepository;
     private AuditLogger $auditLogger;
@@ -38,7 +37,6 @@ class PasskeyHandler implements PublicKeyCredentialSourceRepository
 
     public function __construct()
     {
-        $this->config = App::getInstance();
         $this->db = Connection::getInstance()->getConnection();
         $this->userRepository = new UserRepository();
         $this->auditLogger = new AuditLogger();
@@ -51,9 +49,10 @@ class PasskeyHandler implements PublicKeyCredentialSourceRepository
     private function initializeWebAuthnServer(): void
     {
         // Create relying party entity
+        Environment::load();
         $rpEntity = PublicKeyCredentialRpEntity::create(
             'Auth Service',
-            $this->config->get('app.domain', 'localhost'),
+            Environment::get('APP_DOMAIN', 'localhost'),
             null // icon URL (optional)
         );
 

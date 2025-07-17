@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Repositories\UserRepository;
 use Antinna\Auth\Services\TOTPHandler;
 use Antinna\Auth\Services\SMSMFAHandler;
@@ -13,7 +13,6 @@ use Antinna\Auth\Services\AuditLogger;
  */
 class MFAManager
 {
-    private App $config;
     private UserRepository $userRepository;
     private TOTPHandler $totpHandler;
     private SMSMFAHandler $smsHandler;
@@ -31,7 +30,6 @@ class MFAManager
 
     public function __construct()
     {
-        $this->config = App::getInstance();
         $this->userRepository = new UserRepository();
         $this->totpHandler = new TOTPHandler();
         $this->smsHandler = new SMSMFAHandler();

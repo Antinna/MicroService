@@ -3,17 +3,16 @@
 namespace Antinna\Auth\Tests;
 
 use Antinna\Auth\Services\JWTManager;
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use PHPUnit\Framework\TestCase;
 
 class JWTManagerTest extends TestCase
 {
     private JWTManager $jwtManager;
-    private App $config;
 
     protected function setUp(): void
     {
-        $this->config = App::getInstance();
+        Environment::load();
         $this->jwtManager = new JWTManager();
     }
 
@@ -73,10 +72,10 @@ class JWTManagerTest extends TestCase
     public function testConfigurationAccess()
     {
         // Test that JWT manager can access configuration
-        $secret = $this->config->get('jwt.secret');
+        $secret = Environment::get('JWT_SECRET');
         $this->assertNotEmpty($secret);
         
-        $expiry = $this->config->get('jwt.expiry');
+        $expiry = (int)Environment::get('JWT_EXPIRY', 3600);
         $this->assertIsInt($expiry);
         $this->assertGreaterThan(0, $expiry);
     }

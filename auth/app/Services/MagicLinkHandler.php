@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Database\Connection;
 use Antinna\Auth\Repositories\UserRepository;
 use Antinna\Auth\Services\AuditLogger;
@@ -15,14 +15,12 @@ use PDO;
 class MagicLinkHandler
 {
     private PDO $db;
-    private App $config;
     private UserRepository $userRepository;
     private AuditLogger $auditLogger;
 
     public function __construct()
     {
         $this->db = Connection::getInstance()->getConnection();
-        $this->config = App::getInstance();
         $this->userRepository = new UserRepository();
         $this->auditLogger = new AuditLogger();
     }
@@ -91,7 +89,8 @@ class MagicLinkHandler
             }
 
             // Generate the magic link URL
-            $baseUrl = $this->config->get('app.url', 'https://localhost');
+            Environment::load();
+            $baseUrl = Environment::get('APP_URL', 'https://localhost');
             $magicLinkUrl = $baseUrl . '/auth/magic-link/verify?token=' . urlencode($token);
 
             // Add additional parameters if provided
@@ -480,7 +479,8 @@ class MagicLinkHandler
             $stmt->execute([$userId]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $hourlyLimit = $this->config->get('magic_link.hourly_limit', 5);
+            Environment::load();
+            $hourlyLimit = (int)Environment::get('MAGIC_LINK_HOURLY_LIMIT', 5);
             
             if ($result['count'] >= $hourlyLimit) {
                 $this->auditLogger->log(

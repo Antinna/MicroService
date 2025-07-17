@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Interfaces\MFAHandlerInterface;
 use Antinna\Auth\Repositories\UserRepository;
 use Antinna\Auth\Services\AuditLogger;
@@ -15,7 +15,6 @@ use Exception;
  */
 class SMSMFAHandler implements MFAHandlerInterface
 {
-    private App $config;
     private UserRepository $userRepository;
     private AuditLogger $auditLogger;
     private RateLimiter $rateLimiter;
@@ -23,7 +22,6 @@ class SMSMFAHandler implements MFAHandlerInterface
 
     public function __construct()
     {
-        $this->config = App::getInstance();
         $this->userRepository = new UserRepository();
         $this->auditLogger = new AuditLogger();
         $this->rateLimiter = new RateLimiter();
@@ -363,7 +361,8 @@ class SMSMFAHandler implements MFAHandlerInterface
      */
     private function sendSMS(string $phoneNumber, string $code): array
     {
-        $apiKey = $this->config->get('external_services.sms.api_key');
+        Environment::load();
+        $apiKey = Environment::get('SMS_PROVIDER_API_KEY');
         
         if (empty($apiKey)) {
             // For development/testing - log the code instead of sending SMS

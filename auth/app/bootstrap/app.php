@@ -6,7 +6,7 @@ namespace Antinna\Auth;
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 use Dotenv\Dotenv;
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 
 // Load environment variables
 $basePath = dirname(__DIR__);
@@ -24,8 +24,8 @@ if (!function_exists('env')) {
 // Load helper functions
 require_once __DIR__ . '/../Helpers/functions.php';
 
-// Initialize application configuration
-App::getInstance();
+// Initialize environment configuration
+Environment::load();
 
 // Set error reporting
 error_reporting(E_ALL);

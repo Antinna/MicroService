@@ -2,14 +2,14 @@
 
 require_once __DIR__ . '/bootstrap/app.php';
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Routes\PasskeyRoutes;
 use Antinna\Auth\Routes\MagicLinkRoutes;
 use Antinna\Auth\Routes\ServiceTokenRoutes;
 use Antinna\Auth\Routes\AdminRoutes;
 
-// Initialize application
-$app = App::getInstance();
+// Initialize environment
+Environment::load();
 
 // Set CORS headers for API access
 header('Access-Control-Allow-Origin: *');

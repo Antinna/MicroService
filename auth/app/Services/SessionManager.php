@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Interfaces\SessionManagerInterface;
 use Antinna\Auth\Repositories\SessionRepository;
 use Antinna\Auth\Repositories\UserRepository;
@@ -12,14 +12,12 @@ use Antinna\Auth\Repositories\UserRepository;
  */
 class SessionManager implements SessionManagerInterface
 {
-    private App $config;
     private SessionRepository $sessionRepository;
     private UserRepository $userRepository;
     private JWTManager $jwtManager;
 
     public function __construct()
     {
-        $this->config = App::getInstance();
         $this->sessionRepository = new SessionRepository();
         $this->userRepository = new UserRepository();
         $this->jwtManager = new JWTManager();
@@ -45,7 +43,7 @@ class SessionManager implements SessionManagerInterface
             'user_agent' => $sessionData['user_agent'] ?? $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
             'device_info' => $sessionData['device_info'] ?? $this->extractDeviceInfo(),
             'session_type' => $sessionData['session_type'] ?? 'web',
-            'expires_at' => date('Y-m-d H:i:s', time() + $this->config->get('jwt.expiry', 3600)),
+            'expires_at' => date('Y-m-d H:i:s', time() + (int)Environment::get('JWT_EXPIRY', 3600)),
             'last_activity' => date('Y-m-d H:i:s'),
         ]);
 

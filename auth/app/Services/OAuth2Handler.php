@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Interfaces\SocialAuthInterface;
 use Antinna\Auth\Services\AuditLogger;
 use GuzzleHttp\Client;
@@ -13,7 +13,6 @@ use Exception;
  */
 class OAuth2Handler implements SocialAuthInterface
 {
-    private App $config;
     private Client $httpClient;
     private AuditLogger $auditLogger;
 
@@ -71,7 +70,6 @@ class OAuth2Handler implements SocialAuthInterface
 
     public function __construct()
     {
-        $this->config = App::getInstance();
         $this->httpClient = new Client(['timeout' => 30]);
         $this->auditLogger = new AuditLogger();
     }
@@ -430,19 +428,19 @@ class OAuth2Handler implements SocialAuthInterface
      */
     private function getClientId(string $provider): string
     {
-        $configKey = match($provider) {
-            'google' => 'external_services.google.client_id',
-            'facebook' => 'external_services.facebook.app_id',
-            'apple' => 'external_services.apple.client_id',
-            'github' => 'external_services.github.client_id',
-            'amazon' => 'external_services.amazon.client_id',
-            'twitter' => 'external_services.twitter.client_id',
-            'discord' => 'external_services.discord.client_id',
-            'microsoft' => 'external_services.microsoft.client_id',
+        Environment::load();
+        
+        return match($provider) {
+            'google' => Environment::get('GOOGLE_CLIENT_ID', ''),
+            'facebook' => Environment::get('FACEBOOK_APP_ID', ''),
+            'apple' => Environment::get('APPLE_CLIENT_ID', ''),
+            'github' => Environment::get('GITHUB_CLIENT_ID', ''),
+            'amazon' => Environment::get('AMAZON_CLIENT_ID', ''),
+            'twitter' => Environment::get('TWITTER_CLIENT_ID', ''),
+            'discord' => Environment::get('DISCORD_CLIENT_ID', ''),
+            'microsoft' => Environment::get('MICROSOFT_CLIENT_ID', ''),
             default => ''
         };
-
-        return $this->config->get($configKey, '');
     }
 
     /**
@@ -450,19 +448,19 @@ class OAuth2Handler implements SocialAuthInterface
      */
     private function getClientSecret(string $provider): string
     {
-        $configKey = match($provider) {
-            'google' => 'external_services.google.client_secret',
-            'facebook' => 'external_services.facebook.app_secret',
-            'apple' => 'external_services.apple.private_key',
-            'github' => 'external_services.github.client_secret',
-            'amazon' => 'external_services.amazon.client_secret',
-            'twitter' => 'external_services.twitter.client_secret',
-            'discord' => 'external_services.discord.client_secret',
-            'microsoft' => 'external_services.microsoft.client_secret',
+        Environment::load();
+        
+        return match($provider) {
+            'google' => Environment::get('GOOGLE_CLIENT_SECRET', ''),
+            'facebook' => Environment::get('FACEBOOK_APP_SECRET', ''),
+            'apple' => Environment::get('APPLE_PRIVATE_KEY', ''),
+            'github' => Environment::get('GITHUB_CLIENT_SECRET', ''),
+            'amazon' => Environment::get('AMAZON_CLIENT_SECRET', ''),
+            'twitter' => Environment::get('TWITTER_CLIENT_SECRET', ''),
+            'discord' => Environment::get('DISCORD_CLIENT_SECRET', ''),
+            'microsoft' => Environment::get('MICROSOFT_CLIENT_SECRET', ''),
             default => ''
         };
-
-        return $this->config->get($configKey, '');
     }
 
     /**
@@ -470,7 +468,8 @@ class OAuth2Handler implements SocialAuthInterface
      */
     private function getRedirectUri(string $provider): string
     {
-        $baseUrl = $this->config->get('app.base_url', 'http://localhost:8000');
+        Environment::load();
+        $baseUrl = Environment::get('APP_URL', 'http://localhost:8000');
         return "{$baseUrl}/auth/social/{$provider}/callback";
     }
 

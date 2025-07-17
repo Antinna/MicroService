@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Database\Connection;
 use Antinna\Auth\Repositories\UserRepository;
 use Antinna\Auth\Services\AuditLogger;
@@ -17,7 +17,6 @@ use PDO;
 class UserProfileManager
 {
     private PDO $db;
-    private App $config;
     private UserRepository $userRepository;
     private AuditLogger $auditLogger;
     private EmailService $emailService;
@@ -45,7 +44,6 @@ class UserProfileManager
     public function __construct()
     {
         $this->db = Connection::getInstance()->getConnection();
-        $this->config = App::getInstance();
         $this->userRepository = new UserRepository();
         $this->auditLogger = new AuditLogger();
         $this->emailService = new EmailService();

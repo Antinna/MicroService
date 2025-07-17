@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Interfaces\AuthenticatorInterface;
 use Antinna\Auth\Repositories\UserRepository;
 use Antinna\Auth\Services\AuditLogger;
@@ -13,7 +13,6 @@ use Antinna\Auth\Services\RateLimiter;
  */
 class UserAuthenticator implements AuthenticatorInterface
 {
-    private App $config;
     private UserRepository $userRepository;
     private SessionManager $sessionManager;
     private AuditLogger $auditLogger;
@@ -21,7 +20,6 @@ class UserAuthenticator implements AuthenticatorInterface
 
     public function __construct()
     {
-        $this->config = App::getInstance();
         $this->userRepository = new UserRepository();
         $this->sessionManager = new SessionManager();
         $this->auditLogger = new AuditLogger();
@@ -79,10 +77,11 @@ class UserAuthenticator implements AuthenticatorInterface
 
         // Check account lockout
         $lockoutKey = "account_lockout:{$user['id']}";
-        if (!$this->rateLimiter->checkLimit($lockoutKey, 
-            $this->config->get('security.account_lockout_attempts', 5),
-            $this->config->get('security.account_lockout_duration', 1800)
-        )) {
+        Environment::load();
+        $lockoutAttempts = (int)Environment::get('ACCOUNT_LOCKOUT_ATTEMPTS', 5);
+        $lockoutDuration = (int)Environment::get('ACCOUNT_LOCKOUT_DURATION', 1800);
+        
+        if (!$this->rateLimiter->checkLimit($lockoutKey, $lockoutAttempts, $lockoutDuration)) {
             $this->auditLogger->log('auth_failed', 'Account locked due to too many failed attempts', $user['id'], $ipAddress, 'warning');
             return [
                 'success' => false,
@@ -155,7 +154,7 @@ class UserAuthenticator implements AuthenticatorInterface
                     'phone_verified' => (bool)$user['phone_verified'],
                     'mfa_enabled' => (bool)$user['mfa_enabled']
                 ],
-                'expires_in' => $this->config->get('jwt.expiry', 3600)
+                'expires_in' => (int)Environment::get('JWT_EXPIRY', 3600)
             ];
 
         } catch (\Exception $e) {
@@ -374,8 +373,9 @@ class UserAuthenticator implements AuthenticatorInterface
     private function validatePassword(string $password): array
     {
         $errors = [];
-        $minLength = $this->config->get('security.password_min_length', 8);
-        $requireSpecial = $this->config->get('security.password_require_special', true);
+        Environment::load();
+        $minLength = (int)Environment::get('PASSWORD_MIN_LENGTH', 8);
+        $requireSpecial = Environment::getBool('PASSWORD_REQUIRE_SPECIAL', true);
 
         if (strlen($password) < $minLength) {
             $errors[] = "Password must be at least {$minLength} characters long";

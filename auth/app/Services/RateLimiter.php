@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Database\Connection;
 use Antinna\Auth\Services\AuditLogger;
 use Exception;
@@ -14,7 +14,6 @@ use PDO;
 class RateLimiter
 {
     private PDO $db;
-    private App $config;
     private AuditLogger $auditLogger;
     
     // Rate limit types
@@ -51,7 +50,6 @@ class RateLimiter
     public function __construct()
     {
         $this->db = Connection::getInstance()->getConnection();
-        $this->config = App::getInstance();
         $this->auditLogger = new AuditLogger();
         
         // Load custom limits from config
@@ -557,7 +555,33 @@ class RateLimiter
      */
     private function loadCustomLimits(): void
     {
-        $customLimits = $this->config->get('rate_limiting.limits', []);
+        Environment::load();
+        
+        // Load custom limits from environment variables
+        $customLimits = [];
+        
+        // Check for custom rate limits in environment
+        if (Environment::get('RATE_LIMIT_LOGIN_ATTEMPTS')) {
+            $customLimits['login_attempts'] = [
+                'limit' => (int)Environment::get('RATE_LIMIT_LOGIN_ATTEMPTS', 5),
+                'window' => (int)Environment::get('RATE_LIMIT_LOGIN_WINDOW', self::WINDOW_MINUTE)
+            ];
+        }
+        
+        if (Environment::get('RATE_LIMIT_API_REQUESTS')) {
+            $customLimits['api_requests'] = [
+                'limit' => (int)Environment::get('RATE_LIMIT_API_REQUESTS', 100),
+                'window' => (int)Environment::get('RATE_LIMIT_API_WINDOW', self::WINDOW_MINUTE)
+            ];
+        }
+        
+        if (Environment::get('RATE_LIMIT_REGISTRATION')) {
+            $customLimits['registration'] = [
+                'limit' => (int)Environment::get('RATE_LIMIT_REGISTRATION', 5),
+                'window' => (int)Environment::get('RATE_LIMIT_REGISTRATION_WINDOW', self::WINDOW_HOUR)
+            ];
+        }
+        
         $this->defaultLimits = array_merge($this->defaultLimits, $customLimits);
     }
 

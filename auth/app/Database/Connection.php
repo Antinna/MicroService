@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Database;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use PDO;
 use PDOException;
 
@@ -13,11 +13,9 @@ class Connection
 {
     private static ?Connection $instance = null;
     private ?PDO $connection = null;
-    private App $config;
 
     private function __construct()
     {
-        $this->config = App::getInstance();
         $this->connect();
     }
 
@@ -32,11 +30,12 @@ class Connection
     private function connect(): void
     {
         try {
-            $host = $this->config->get('database.host');
-            $port = $this->config->get('database.port');
-            $dbname = $this->config->get('database.name');
-            $username = $this->config->get('database.username');
-            $password = $this->config->get('database.password');
+            Environment::load();
+            $host = Environment::get('DB_HOST', 'localhost');
+            $port = Environment::get('DB_PORT', '3306');
+            $dbname = Environment::get('DB_NAME', 'auth_service');
+            $username = Environment::get('DB_USERNAME', 'auth_user');
+            $password = Environment::get('DB_PASSWORD', '');
 
             $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
 

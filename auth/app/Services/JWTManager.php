@@ -2,7 +2,7 @@
 
 namespace Antinna\Auth\Services;
 
-use Antinna\Auth\Config\App;
+use Antinna\Auth\Config\Environment;
 use Antinna\Auth\Interfaces\TokenManagerInterface;
 use Antinna\Auth\Repositories\UserRepository;
 use Firebase\JWT\JWT;
@@ -16,13 +16,11 @@ use Exception;
  */
 class JWTManager implements TokenManagerInterface
 {
-    private App $config;
     private UserRepository $userRepository;
     private TokenBlacklistService $blacklistService;
 
     public function __construct()
     {
-        $this->config = App::getInstance();
         $this->userRepository = new UserRepository();
         $this->blacklistService = new TokenBlacklistService();
     }
@@ -35,7 +33,8 @@ class JWTManager implements TokenManagerInterface
         }
 
         $now = time();
-        $expiry = $now + $this->config->get('jwt.expiry', 3600);
+        Environment::load();
+        $expiry = $now + (int)Environment::get('JWT_EXPIRY', 3600);
 
         $payload = [
             'iss' => 'auth-service',
@@ -61,8 +60,8 @@ class JWTManager implements TokenManagerInterface
             }
         }
 
-        $secret = $this->config->get('jwt.secret');
-        $algorithm = $this->config->get('jwt.algorithm', 'HS256');
+        $secret = Environment::get('JWT_SECRET');
+        $algorithm = Environment::get('JWT_ALGORITHM', 'HS256');
 
         return JWT::encode($payload, $secret, $algorithm);
     }
@@ -70,8 +69,8 @@ class JWTManager implements TokenManagerInterface
     public function validateToken(string $token): array
     {
         try {
-            $secret = $this->config->get('jwt.secret');
-            $algorithm = $this->config->get('jwt.algorithm', 'HS256');
+            $secret = Environment::get('JWT_SECRET');
+            $algorithm = Environment::get('JWT_ALGORITHM', 'HS256');
 
             $decoded = JWT::decode($token, new Key($secret, $algorithm));
             $payload = (array)$decoded;
@@ -130,8 +129,8 @@ class JWTManager implements TokenManagerInterface
             
             // Try to decode expired token to get user info
             try {
-                $secret = $this->config->get('jwt.secret');
-                $algorithm = $this->config->get('jwt.algorithm', 'HS256');
+                $secret = Environment::get('JWT_SECRET');
+                $algorithm = Environment::get('JWT_ALGORITHM', 'HS256');
                 
                 // Decode without verification to get payload
                 $parts = explode('.', $token);
@@ -147,7 +146,7 @@ class JWTManager implements TokenManagerInterface
                 }
                 
                 // Check if token expired within refresh window
-                $refreshWindow = $this->config->get('jwt.refresh_expiry', 604800);
+                $refreshWindow = (int)Environment::get('JWT_REFRESH_EXPIRY', 604800);
                 $expiredAt = $payload['exp'] ?? 0;
                 
                 if (time() - $expiredAt > $refreshWindow) {
@@ -224,8 +223,8 @@ class JWTManager implements TokenManagerInterface
             'jti' => bin2hex(random_bytes(16)),
         ];
 
-        $secret = $this->config->get('jwt.secret');
-        $algorithm = $this->config->get('jwt.algorithm', 'HS256');
+        $secret = Environment::get('JWT_SECRET');
+        $algorithm = Environment::get('JWT_ALGORITHM', 'HS256');
 
         return JWT::encode($payload, $secret, $algorithm);
     }
