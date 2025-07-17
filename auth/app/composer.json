@@ -1,20 +1,33 @@
 {
     "name": "antinna/auth",
-    "description": "All Online Pay workflows here",
+    "description": "Authentication microservice for the platform",
     "type": "project",
     "require": {
-      "php": "8.1.*||8.2.*||8.3.*||8.4.*",
-      "ext-pdo": "*",
-      "vlucas/phpdotenv": "^5.6.2"
+        "php": "8.1.*||8.2.*||8.3.*||8.4.*",
+        "ext-pdo": "*",
+        "ext-json": "*",
+        "ext-openssl": "*",
+        "vlucas/phpdotenv": "^5.6.2",
+        "firebase/php-jwt": "^6.10",
+        "spomky-labs/otphp": "^11.2",
+        "guzzlehttp/guzzle": "^7.8",
+        "web-auth/webauthn-lib": "^4.9"
     },
-
-  "minimum-stability": "stable",
-  "prefer-stable": true,
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
     "license": "MIT",
     "autoload": {
-      "psr-4": {
-        "Antinna\\Auth\\": "./"
-      }
+        "psr-4": {
+            "Antinna\\Auth\\": "./"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Antinna\\Auth\\Tests\\": "Tests/"
+        }
     },
     "authors": [
         {

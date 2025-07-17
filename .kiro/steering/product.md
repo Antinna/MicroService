@@ -3,7 +3,7 @@
 This is a microservices-based platform for dairy and vegetable delivery with subscription models. The system handles vendor onboarding, product management, payments, authentication, social features, and delivery logistics.
 
 ## Core Services
-- **Auth**: Multi-method authentication (passkeys, magic links, social logins, MFA)
+- **Auth**: Multi-method authentication (passkeys, magic links, social logins with firebase, MFA)
 - **Pay**: Payment processing, refunds, and vendor payouts
 - **Social**: Chat and video calling functionality
 - **Delivery**: Logistics and delivery management with cold-chain support

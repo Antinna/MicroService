@@ -1,13 +1,342 @@
+[package]
+name = "auth-service"
+version = "1.0.0"
+description = "Authentication microservice providing comprehensive authentication solutions"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/example/auth-service"
+homepage = "https://auth-service.example.com"
+keywords = ["authentication", "jwt", "mfa", "biometric", "oauth", "microservice"]
+
+[package.metadata]
+authors = ["Development Team <dev@example.com>"]
+categories = ["authentication", "security", "microservice"]
+documentation = "https://docs.example.com/auth-service"
+
 [dependencies]
-"php/php" = "=8.3.401"
+# PHP runtime dependencies will be managed by Composer
+# This section is for Wasmer-specific dependencies
 
 [fs]
+# File system access configuration
 "/app" = "app"
-"/config" = "config" 
+"/tmp" = "."
+"/var/log" = "."
 
-[[command]]
-name = "run"
-module = "php/php:php"
-runner = "wasi"
-[command.annotations.wasi]
-main-args = ["-t", "/app", "-S", "localhost:8080"]
+[env]
+# Default environment variables
+# These can be overridden by app.yaml or deployment configuration
+APP_ENV = "production"
+SERVICE_NAME = "auth-service"
+SERVICE_VERSION = "1.0.0"
+
+[command]
+# Main command to run the service
+name = "auth-service"
+runner = "https://webc.org/runner/php"
+
+# Alternative runners for different environments
+[command.dev]
+runner = "https://webc.org/runner/php-dev"
+
+[command.debug]
+runner = "https://webc.org/runner/php-debug"
+
+# Build configuration
+[build]
+# Build steps for the authentication service
+steps = [
+    "composer install --no-dev --optimize-autoloader",
+    "php -l index.php",
+    "php migrate.php --check"
+]
+
+# Development build steps
+[build.dev]
+steps = [
+    "composer install --optimize-autoloader",
+    "php -l index.php",
+    "php migrate.php --check",
+    "vendor/bin/phpunit --configuration phpunit.xml"
+]
+
+# Module configuration
+[module]
+name = "auth-service"
+source = "app"
+abi = "wasi"
+
+# WASI configuration
+[module.wasi]
+# Environment variables that should be passed to the WASI module
+env = [
+    "APP_ENV",
+    "DB_HOST",
+    "DB_PORT", 
+    "DB_NAME",
+    "DB_USERNAME",
+    "DB_PASSWORD",
+    "JWT_SECRET",
+    "ENCRYPTION_KEY"
+]
+
+# Directories that should be pre-opened for the WASI module
+preopened-dirs = [
+    "/app",
+    "/tmp",
+    "/var/log"
+]
+
+# Network access configuration
+[module.wasi.network]
+# Allow outbound network connections
+outbound = true
+# Specific allowed hosts for external API calls
+allowed-hosts = [
+    "accounts.google.com",
+    "graph.facebook.com", 
+    "api.github.com",
+    "appleid.apple.com",
+    "login.microsoftonline.com",
+    "api.twitter.com",
+    "discord.com/api",
+    "api.amazon.com",
+    "fcm.googleapis.com"
+]
+
+# Resource limits
+[module.resources]
+# Memory limit (in bytes)
+memory = 536870912  # 512MB
+# CPU time limit (in seconds)
+cpu-time = 30
+# Maximum file descriptors
+max-fds = 100
+
+# Networking configuration
+[network]
+# Port binding
+[[network.port]]
+local = 8080
+public = true
+protocol = "http"
+
+# Health check endpoint
+[[network.health-check]]
+path = "/health"
+port = 8080
+interval = 30
+timeout = 5
+
+# Metrics endpoint
+[[network.metrics]]
+path = "/health/metrics"
+port = 8080
+enabled = true
+
+# Security configuration
+[security]
+# Capabilities required by the service
+capabilities = [
+    "network-outbound",
+    "filesystem-read",
+    "filesystem-write",
+    "clock-time"
+]
+
+# Sandboxing options
+sandbox = true
+isolation = "process"
+
+# Logging configuration
+[logging]
+level = "info"
+format = "json"
+destinations = ["stdout", "file"]
+
+[logging.file]
+path = "/tmp/auth-service.log"
+max-size = "100MB"
+max-files = 5
+compress = true
+
+# Monitoring and observability
+[monitoring]
+# Enable metrics collection
+metrics = true
+# Metrics format (prometheus, json, etc.)
+metrics-format = "prometheus"
+# Health check configuration
+health-checks = true
+
+# Performance tuning
+[performance]
+# Enable JIT compilation if available
+jit = true
+# Optimize for startup time vs runtime performance
+optimize-for = "runtime"
+# Garbage collection settings
+gc-frequency = "auto"
+
+# Development configuration
+[dev]
+# Hot reload for development
+hot-reload = true
+# Debug mode
+debug = true
+# Development server port
+port = 3000
+
+# Testing configuration
+[test]
+# Test command
+command = "vendor/bin/phpunit"
+# Test configuration file
+config = "phpunit.xml"
+# Coverage reporting
+coverage = true
+
+# Deployment configuration
+[deploy]
+# Deployment strategy
+strategy = "rolling"
+# Health check before deployment
+health-check = true
+# Rollback on failure
+auto-rollback = true
+
+# Environment-specific configurations
+[deploy.development]
+replicas = 1
+resources.memory = "256MB"
+resources.cpu = "0.25"
+
+[deploy.staging]
+replicas = 2
+resources.memory = "512MB" 
+resources.cpu = "0.5"
+
+[deploy.production]
+replicas = 3
+resources.memory = "1GB"
+resources.cpu = "1.0"
+# Production-specific security settings
+security.strict = true
+security.audit = true
+
+# Backup and recovery
+[backup]
+enabled = false
+schedule = "0 2 * * *"
+retention = "30d"
+storage = "s3"
+
+# Cache configuration
+[cache]
+enabled = true
+type = "memory"
+size = "64MB"
+ttl = 3600
+
+# Database configuration
+[database]
+# Connection pooling
+pool-size = 20
+max-connections = 50
+connection-timeout = 30
+idle-timeout = 300
+
+# Migration settings
+[database.migrations]
+auto-migrate = false
+migration-path = "Database/Migrations"
+backup-before-migrate = true
+
+# External integrations
+[integrations]
+# Monitoring services
+[integrations.prometheus]
+enabled = false
+endpoint = "/metrics"
+port = 8080
+
+[integrations.grafana]
+enabled = false
+dashboard-url = ""
+
+# Logging services
+[integrations.elasticsearch]
+enabled = false
+endpoint = ""
+index = "auth-service"
+
+[integrations.fluentd]
+enabled = false
+endpoint = ""
+tag = "auth-service"
+
+# Error tracking
+[integrations.sentry]
+enabled = false
+dsn = ""
+environment = "production"
+
+# APM services
+[integrations.newrelic]
+enabled = false
+license-key = ""
+app-name = "auth-service"
+
+# Service mesh integration
+[service-mesh]
+enabled = false
+type = "istio"
+mtls = true
+circuit-breaker = true
+
+# API Gateway integration
+[api-gateway]
+enabled = false
+type = "kong"
+rate-limiting = true
+authentication = true
+
+# Load balancer configuration
+[load-balancer]
+algorithm = "round-robin"
+health-check = true
+sticky-sessions = false
+timeout = 30
+
+# SSL/TLS configuration
+[tls]
+enabled = true
+cert-file = "/etc/ssl/certs/auth-service.crt"
+key-file = "/etc/ssl/private/auth-service.key"
+protocols = ["TLSv1.2", "TLSv1.3"]
+ciphers = "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS"
+
+# Container configuration (if running in containers)
+[container]
+image = "auth-service:latest"
+registry = "registry.example.com"
+tag-strategy = "semantic"
+
+# Kubernetes integration
+[kubernetes]
+enabled = false
+namespace = "auth-service"
+service-account = "auth-service"
+config-map = "auth-service-config"
+secret = "auth-service-secrets"
+
+# Helm chart configuration
+[kubernetes.helm]
+chart-name = "auth-service"
+chart-version = "1.0.0"
+values-file = "values.yaml"
+
+# Custom resource definitions
+[kubernetes.crd]
+enabled = false
+definitions = []

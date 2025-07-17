@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.1/phpunit.xsd"
+         bootstrap="bootstrap/app.php"
+         colors="true"
+         processIsolation="false"
+         stopOnFailure="false"
+         cacheDirectory=".phpunit.cache"
+         backupGlobals="false"
+         backupStaticProperties="false">
+
+    <testsuites>
+        <testsuite name="Unit Tests">
+            <directory>Tests/Unit</directory>
+        </testsuite>
+        
+        <testsuite name="Integration Tests">
+            <directory>Tests/Integration</directory>
+        </testsuite>
+        
+        <testsuite name="Performance Tests">
+            <directory>Tests/Performance</directory>
+        </testsuite>
+        
+        <testsuite name="Security Tests">
+            <directory>Tests/Security</directory>
+        </testsuite>
+    </testsuites>
+
+    <source>
+        <include>
+            <directory>Services</directory>
+            <directory>Controllers</directory>
+            <directory>Repositories</directory>
+            <directory>Middleware</directory>
+            <directory>Helpers</directory>
+        </include>
+        <exclude>
+            <directory>Tests</directory>
+            <directory>vendor</directory>
+            <directory>Examples</directory>
+        </exclude>
+    </source>
+
+    <coverage>
+        <report>
+            <html outputDirectory="coverage-html" lowUpperBound="50" highLowerBound="80"/>
+            <text outputFile="coverage.txt" showUncoveredFiles="true"/>
+            <xml outputDirectory="coverage-xml"/>
+        </report>
+    </coverage>
+
+    <logging>
+        <junit outputFile="test-results.xml"/>
+        <teamcity outputFile="teamcity.txt"/>
+    </logging>
+
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="DB_HOST" value="localhost"/>
+        <env name="DB_PORT" value="3306"/>
+        <env name="DB_NAME" value="auth_test"/>
+        <env name="DB_USERNAME" value="test_user"/>
+        <env name="DB_PASSWORD" value="test_password"/>
+        <env name="JWT_SECRET" value="test_jwt_secret_key_for_testing_only"/>
+        <env name="ENCRYPTION_KEY" value="test_encryption_key_32_characters"/>
+        <env name="RATE_LIMIT_ENABLED" value="true"/>
+        <env name="RATE_LIMIT_MAX_ATTEMPTS" value="10"/>
+        <env name="RATE_LIMIT_WINDOW" value="60"/>
+        <env name="SESSION_LIFETIME" value="3600"/>
+        <env name="TOKEN_EXPIRY" value="3600"/>
+        <env name="REFRESH_TOKEN_EXPIRY" value="86400"/>
+        <env name="MFA_CODE_EXPIRY" value="300"/>
+        <env name="MAGIC_LINK_EXPIRY" value="900"/>
+        <env name="PASSWORD_MIN_LENGTH" value="8"/>
+        <env name="PASSWORD_REQUIRE_UPPERCASE" value="true"/>
+        <env name="PASSWORD_REQUIRE_LOWERCASE" value="true"/>
+        <env name="PASSWORD_REQUIRE_NUMBERS" value="true"/>
+        <env name="PASSWORD_REQUIRE_SPECIAL" value="true"/>
+        <env name="AUDIT_LOG_ENABLED" value="true"/>
+        <env name="SECURITY_MONITORING_ENABLED" value="true"/>
+        <env name="BIOMETRIC_ENABLED" value="true"/>
+        <env name="PASSKEY_ENABLED" value="true"/>
+        <env name="MAGIC_LINK_ENABLED" value="true"/>
+        <env name="SOCIAL_AUTH_ENABLED" value="true"/>
+        <env name="PUSH_NOTIFICATIONS_ENABLED" value="true"/>
+        <env name="OFFLINE_AUTH_ENABLED" value="true"/>
+        <env name="EMAIL_SERVICE_ENABLED" value="false"/>
+        <env name="SMS_SERVICE_ENABLED" value="false"/>
+        <env name="FIREBASE_ENABLED" value="false"/>
+    </php>
+
+    <groups>
+        <exclude>
+            <group>slow</group>
+            <group>external</group>
+        </exclude>
+    </groups>
+
+</phpunit>

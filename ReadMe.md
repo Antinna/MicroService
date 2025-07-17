@@ -1,6 +1,12 @@
 We have Github workflow to deploy the Microservices
 we have different microservices like auth, pay, social (for social media kind chat and video call), delivery and multivendor 
 
+for MySQL we have some fixed ## Environment Variables
+Services use environment-based configuration for:
+- `DB_HOST`, `DB_PORT`, `DB_NAME`: Database connection
+- `DB_USERNAME`, `DB_PASSWORD`: Database credentials 
+Also you can add more Variables but you have no guide me what variable you have used and for what microservice , also do update Readme file for that to show variables in Use
+
 
 ✅ Core Responsibilities of multivendor service:
 Responsibility	Description
@@ -79,4 +85,8 @@ Trace food safety incidents
 
 Prove freshness & source compliance
 
-and here for notification-service we use firebase notification and SMS as well as Email
+and here for notification-service we use firebase notification (single firebase project for all our microservices) and SMS as well as Email
+
+
+# Pay 
+payments, refunds, payouts and more

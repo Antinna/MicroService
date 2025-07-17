@@ -68,7 +68,7 @@ The multivendor service is the core platform component that manages vendor onboa
 
 ### Requirement 6: Payment Integration and Vendor Payouts
 
-**User Story:** As a vendor, I want to receive timely payments for my sales so that I can maintain cash flow for my business.I will Integrate Google Pay to colelct Payments and To Payout I will try Pay wish Cheque
+**User Story:** As a vendor, I want to receive timely payments for my sales so that I can maintain cash flow for my business.I will Integrate Google Pay to colelct Payments and To Payout I will try Paying  Cheque book page
 
 #### Acceptance Criteria
 

@@ -1,0 +1,167 @@
+{
+    "migration_6878eff77346f3.86720063": {
+        "id": "migration_6878eff77346f3.86720063",
+        "status": "completed",
+        "started_at": 1752756215,
+        "services": {
+            "auth": {
+                "name": "Authentication Service",
+                "status": "failed",
+                "started_at": 1752756215,
+                "completed_at": 1752756219,
+                "error": "Failed to connect to service: auth",
+                "progress": 0
+            },
+            "pay": {
+                "name": "Payment Service",
+                "status": "failed",
+                "started_at": 1752756219,
+                "completed_at": 1752756224,
+                "error": "Failed to connect to service: pay",
+                "progress": 0
+            },
+            "social": {
+                "name": "Social Service",
+                "status": "failed",
+                "started_at": 1752756224,
+                "completed_at": 1752756228,
+                "error": "Failed to connect to service: social",
+                "progress": 0
+            },
+            "delivery": {
+                "name": "Delivery Service",
+                "status": "failed",
+                "started_at": 1752756228,
+                "completed_at": 1752765689,
+                "error": "Failed to connect to service: delivery",
+                "progress": 0
+            },
+            "multivendor": {
+                "name": "Multivendor Service",
+                "status": "completed",
+                "started_at": 1752765689,
+                "completed_at": 1752765689,
+                "error": null,
+                "progress": 0
+            }
+        },
+        "options": {
+            "parallel": false,
+            "continue_on_error": true,
+            "test_mode": true
+        },
+        "total_services": 5,
+        "completed_services": 1,
+        "failed_services": 4,
+        "completed_at": 1752765689
+    },
+    "migration_687914f91bd3e8.96895284": {
+        "id": "migration_687914f91bd3e8.96895284",
+        "status": "failed",
+        "started_at": 1752765689,
+        "services": {
+            "auth": {
+                "name": "Authentication Service",
+                "status": "failed",
+                "started_at": 1752765689,
+                "completed_at": 1752765693,
+                "error": "Migration failed for service: auth",
+                "progress": 0
+            },
+            "pay": {
+                "name": "Payment Service",
+                "status": "pending",
+                "started_at": null,
+                "completed_at": null,
+                "error": null,
+                "progress": 0
+            },
+            "social": {
+                "name": "Social Service",
+                "status": "pending",
+                "started_at": null,
+                "completed_at": null,
+                "error": null,
+                "progress": 0
+            },
+            "delivery": {
+                "name": "Delivery Service",
+                "status": "pending",
+                "started_at": null,
+                "completed_at": null,
+                "error": null,
+                "progress": 0
+            },
+            "multivendor": {
+                "name": "Multivendor Service",
+                "status": "pending",
+                "started_at": null,
+                "completed_at": null,
+                "error": null,
+                "progress": 0
+            }
+        },
+        "options": {
+            "test_mode": true
+        },
+        "total_services": 5,
+        "completed_services": 0,
+        "failed_services": 2,
+        "completed_at": 1752765693,
+        "error": "Migration failed for service: auth"
+    },
+    "migration_687914fd35ec06.54694972": {
+        "id": "migration_687914fd35ec06.54694972",
+        "status": "running",
+        "started_at": 1752765693,
+        "services": {
+            "auth": {
+                "name": "Authentication Service",
+                "status": "pending",
+                "started_at": null,
+                "completed_at": null,
+                "error": null,
+                "progress": 0
+            },
+            "pay": {
+                "name": "Payment Service",
+                "status": "pending",
+                "started_at": null,
+                "completed_at": null,
+                "error": null,
+                "progress": 0
+            },
+            "social": {
+                "name": "Social Service",
+                "status": "pending",
+                "started_at": null,
+                "completed_at": null,
+                "error": null,
+                "progress": 0
+            },
+            "delivery": {
+                "name": "Delivery Service",
+                "status": "pending",
+                "started_at": null,
+                "completed_at": null,
+                "error": null,
+                "progress": 0
+            },
+            "multivendor": {
+                "name": "Multivendor Service",
+                "status": "pending",
+                "started_at": null,
+                "completed_at": null,
+                "error": null,
+                "progress": 0
+            }
+        },
+        "options": {
+            "parallel": true,
+            "test_mode": true
+        },
+        "total_services": 5,
+        "completed_services": 0,
+        "failed_services": 0
+    }
+}

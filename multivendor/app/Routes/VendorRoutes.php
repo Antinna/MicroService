@@ -23,7 +23,7 @@ class VendorRoutes
     {
         // Remove /api prefix if present
         $path = preg_replace('/^\/api/', '', $path);
-        
+
         // Parse path segments
         $segments = array_filter(explode('/', $path));
         $segments = array_values($segments); // Re-index array
@@ -33,23 +33,23 @@ class VendorRoutes
             case 'GET':
                 $this->handleGetRequests($segments);
                 break;
-                
+
             case 'POST':
                 $this->handlePostRequests($segments);
                 break;
-                
+
             case 'PUT':
                 $this->handlePutRequests($segments);
                 break;
-                
+
             case 'PATCH':
                 $this->handlePatchRequests($segments);
                 break;
-                
+
             case 'DELETE':
                 $this->handleDeleteRequests($segments);
                 break;
-                
+
             default:
                 $this->sendMethodNotAllowed();
                 break;
@@ -74,50 +74,62 @@ class VendorRoutes
 
         // GET /vendors/{id} - Get vendor profile
         if (count($segments) === 2 && is_numeric($segments[1])) {
-            $this->controller->getProfile((int)$segments[1]);
+            $this->controller->getProfile((int) $segments[1]);
             return;
         }
 
         // GET /vendors/{id}/kyc/status - Get KYC status
-        if (count($segments) === 4 && is_numeric($segments[1]) && 
-            $segments[2] === 'kyc' && $segments[3] === 'status') {
-            $this->controller->getKYCStatus((int)$segments[1]);
+        if (
+            count($segments) === 4 && is_numeric($segments[1]) &&
+            $segments[2] === 'kyc' && $segments[3] === 'status'
+        ) {
+            $this->controller->getKYCStatus((int) $segments[1]);
             return;
         }
 
         // GET /vendors/{id}/compliance - Get compliance status
-        if (count($segments) === 3 && is_numeric($segments[1]) && 
-            $segments[2] === 'compliance') {
-            $this->controller->getComplianceStatus((int)$segments[1]);
+        if (
+            count($segments) === 3 && is_numeric($segments[1]) &&
+            $segments[2] === 'compliance'
+        ) {
+            $this->controller->getComplianceStatus((int) $segments[1]);
             return;
         }
 
         // GET /vendors/{id}/roles - Get vendor roles
-        if (count($segments) === 3 && is_numeric($segments[1]) && 
-            $segments[2] === 'roles') {
-            $this->controller->getRoles((int)$segments[1]);
+        if (
+            count($segments) === 3 && is_numeric($segments[1]) &&
+            $segments[2] === 'roles'
+        ) {
+            $this->controller->getRoles((int) $segments[1]);
             return;
         }
 
         // GET /vendors/{id}/users/{userId}/permissions - Check user permissions
-        if (count($segments) === 5 && is_numeric($segments[1]) && 
-            $segments[2] === 'users' && is_numeric($segments[3]) && 
-            $segments[4] === 'permissions') {
-            $this->controller->checkPermissions((int)$segments[1], (int)$segments[3]);
+        if (
+            count($segments) === 5 && is_numeric($segments[1]) &&
+            $segments[2] === 'users' && is_numeric($segments[3]) &&
+            $segments[4] === 'permissions'
+        ) {
+            $this->controller->checkPermissions((int) $segments[1], (int) $segments[3]);
             return;
         }
 
         // GET /vendors/{id}/stats - Get vendor statistics
-        if (count($segments) === 3 && is_numeric($segments[1]) && 
-            $segments[2] === 'stats') {
-            $this->controller->getStatistics((int)$segments[1]);
+        if (
+            count($segments) === 3 && is_numeric($segments[1]) &&
+            $segments[2] === 'stats'
+        ) {
+            $this->controller->getStatistics((int) $segments[1]);
             return;
         }
 
         // GET /vendors/{id}/documents - Get vendor documents
-        if (count($segments) === 3 && is_numeric($segments[1]) && 
-            $segments[2] === 'documents') {
-            $this->controller->getDocuments((int)$segments[1]);
+        if (
+            count($segments) === 3 && is_numeric($segments[1]) &&
+            $segments[2] === 'documents'
+        ) {
+            $this->controller->getDocuments((int) $segments[1]);
             return;
         }
 
@@ -141,30 +153,38 @@ class VendorRoutes
         }
 
         // POST /vendors/{id}/kyc/validate - Validate KYC documents
-        if (count($segments) === 4 && is_numeric($segments[1]) && 
-            $segments[2] === 'kyc' && $segments[3] === 'validate') {
-            $this->controller->validateKYC((int)$segments[1]);
+        if (
+            count($segments) === 4 && is_numeric($segments[1]) &&
+            $segments[2] === 'kyc' && $segments[3] === 'validate'
+        ) {
+            $this->controller->validateKYC((int) $segments[1]);
             return;
         }
 
         // POST /vendors/{id}/fssai/validate - Validate FSSAI license
-        if (count($segments) === 4 && is_numeric($segments[1]) && 
-            $segments[2] === 'fssai' && $segments[3] === 'validate') {
-            $this->controller->validateFSSAI((int)$segments[1]);
+        if (
+            count($segments) === 4 && is_numeric($segments[1]) &&
+            $segments[2] === 'fssai' && $segments[3] === 'validate'
+        ) {
+            $this->controller->validateFSSAI((int) $segments[1]);
             return;
         }
 
         // POST /vendors/{id}/roles - Assign role
-        if (count($segments) === 3 && is_numeric($segments[1]) && 
-            $segments[2] === 'roles') {
-            $this->controller->assignRole((int)$segments[1]);
+        if (
+            count($segments) === 3 && is_numeric($segments[1]) &&
+            $segments[2] === 'roles'
+        ) {
+            $this->controller->assignRole((int) $segments[1]);
             return;
         }
 
         // POST /vendors/{id}/documents - Upload document
-        if (count($segments) === 3 && is_numeric($segments[1]) && 
-            $segments[2] === 'documents') {
-            $this->controller->uploadDocument((int)$segments[1]);
+        if (
+            count($segments) === 3 && is_numeric($segments[1]) &&
+            $segments[2] === 'documents'
+        ) {
+            $this->controller->uploadDocument((int) $segments[1]);
             return;
         }
 
@@ -183,14 +203,16 @@ class VendorRoutes
 
         // PUT /vendors/{id} - Update vendor profile
         if (count($segments) === 2 && is_numeric($segments[1])) {
-            $this->controller->updateProfile((int)$segments[1]);
+            $this->controller->updateProfile((int) $segments[1]);
             return;
         }
 
         // PUT /vendors/{id}/roles/{userId} - Update user role
-        if (count($segments) === 4 && is_numeric($segments[1]) && 
-            $segments[2] === 'roles' && is_numeric($segments[3])) {
-            $this->controller->updateRole((int)$segments[1], (int)$segments[3]);
+        if (
+            count($segments) === 4 && is_numeric($segments[1]) &&
+            $segments[2] === 'roles' && is_numeric($segments[3])
+        ) {
+            $this->controller->updateRole((int) $segments[1], (int) $segments[3]);
             return;
         }
 
@@ -208,9 +230,11 @@ class VendorRoutes
         }
 
         // PATCH /vendors/{id}/status - Update vendor status
-        if (count($segments) === 3 && is_numeric($segments[1]) && 
-            $segments[2] === 'status') {
-            $this->controller->updateStatus((int)$segments[1]);
+        if (
+            count($segments) === 3 && is_numeric($segments[1]) &&
+            $segments[2] === 'status'
+        ) {
+            $this->controller->updateStatus((int) $segments[1]);
             return;
         }
 
@@ -228,9 +252,11 @@ class VendorRoutes
         }
 
         // DELETE /vendors/{id}/roles/{userId} - Remove user role
-        if (count($segments) === 4 && is_numeric($segments[1]) && 
-            $segments[2] === 'roles' && is_numeric($segments[3])) {
-            $this->controller->removeRole((int)$segments[1], (int)$segments[3]);
+        if (
+            count($segments) === 4 && is_numeric($segments[1]) &&
+            $segments[2] === 'roles' && is_numeric($segments[3])
+        ) {
+            $this->controller->removeRole((int) $segments[1], (int) $segments[3]);
             return;
         }
 
